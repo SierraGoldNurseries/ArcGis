@@ -1,0 +1,9 @@
+{
+  "name": "SGN Structures App",
+  "short_name": "SGN Map",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f0f5fa",
+  "theme_color": "#0f766e",
+  "description": "SGN structures map app with grouped colors, labels, admin import tools, and mobile-friendly viewing."
+}

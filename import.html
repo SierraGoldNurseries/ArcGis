@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SGN Project Builder</title>
+  <style>
+    :root{--bg:#0f172a;--card:#fff;--ink:#102033;--muted:#64748b;--line:#e2e8f0;--brand:#0f766e;--brand2:#0ea5e9;--ok:#16a34a;--warn:#ca8a04;--danger:#dc2626;--shadow:0 18px 50px rgba(2,6,23,.22)}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#e0f2fe,#f0fdfa 38%,#f8fafc);color:var(--ink);min-height:100vh}.wrap{max-width:1120px;margin:0 auto;padding:24px}.top{display:flex;align-items:center;gap:14px;margin-bottom:18px}.logo{width:48px;height:48px;border-radius:18px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;color:white;font-weight:900}.title h1{margin:0;font-size:26px;letter-spacing:-.02em}.title p{margin:4px 0 0;color:var(--muted);font-weight:700}.spacer{flex:1}.btn,button{border:1px solid var(--line);background:white;border-radius:14px;padding:11px 14px;font-weight:900;cursor:pointer;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}.primary{background:var(--brand);border-color:var(--brand);color:white}.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.card{background:rgba(255,255,255,.9);backdrop-filter:blur(14px);border:1px solid rgba(226,232,240,.95);border-radius:24px;box-shadow:var(--shadow);padding:18px}.card h2{margin:0 0 8px;font-size:18px}.muted{color:var(--muted);font-size:14px;line-height:1.5}.drop{border:2px dashed #99f6e4;border-radius:22px;background:#f0fdfa;padding:36px 18px;text-align:center;margin:14px 0;transition:.15s}.drop.drag{background:#ccfbf1;border-color:#14b8a6}.drop h3{margin:0 0 8px;font-size:22px}.drop p{margin:0;color:var(--muted);font-weight:700}.fileRow{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:16px;padding:10px;margin-top:10px;background:white}.fileIcon{width:42px;height:42px;border-radius:14px;background:#e0f2fe;display:grid;place-items:center;font-weight:900;color:#0369a1}.fileMeta{flex:1;min-width:0}.fileMeta b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fileMeta small{color:var(--muted);font-weight:700}.steps{display:grid;gap:10px;margin:15px 0}.step{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:16px;background:white}.badge{width:26px;height:26px;border-radius:999px;background:#e2e8f0;display:grid;place-items:center;font-weight:900;flex:none}.step.active .badge{background:#fef3c7;color:#92400e}.step.done .badge{background:#dcfce7;color:#166534}.step.fail .badge{background:#fee2e2;color:#991b1b}.step b{display:block}.step span{font-size:13px;color:var(--muted)}label{display:block;font-size:12px;font-weight:900;color:#475569;margin:12px 0 5px}input,select{width:100%;height:42px;border:1px solid var(--line);border-radius:14px;padding:0 12px;font-weight:700;background:white}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.notice{background:#fffbeb;border:1px solid #fde68a;border-radius:16px;padding:12px;color:#78350f;font-weight:700;font-size:13px;line-height:1.45}.okbox{background:#ecfdf5;border:1px solid #99f6e4;color:#134e4a}.log{height:180px;overflow:auto;background:#0f172a;color:#d1fae5;border-radius:16px;padding:12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap}.mini{font-size:12px;color:var(--muted)}.hidden{display:none!important}@media(max-width:850px){.wrap{padding:14px}.grid{grid-template-columns:1fr}.top{align-items:flex-start}.title h1{font-size:21px}.spacer{display:none}.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="logo">SGN</div><div class="title"><h1>Project Builder</h1><p>Upload ArcGIS project files from the website, build data in the backend, and return to the live map.</p></div><div class="spacer"></div><a class="btn" href="index.html">← Live Map</a></div>
+  <div class="grid">
+    <section class="card">
+      <h2>1. Pick a project file</h2>
+      <div class="muted">Supported backend files: <b>.ppkx</b>, <b>.mpkx</b>, <b>.gdb.zip</b>, <b>.shp.zip</b>, <b>.geojson</b>, <b>.json</b>, <b>.kml</b>, and CSV exports. ArcGIS packages are uploaded to GitHub and converted by the Actions workflow.</div>
+      <div id="drop" class="drop"><h3>Drop file here</h3><p>or click to choose a file</p><input id="file" type="file" class="hidden" accept=".ppkx,.mpkx,.zip,.geojson,.json,.kml,.csv" /></div>
+      <div id="fileInfo"></div>
+      <div class="actions"><button class="primary" id="uploadBtn" disabled>Upload + Build</button><button id="previewBtn" disabled>Preview browser-friendly file</button><button id="resetBtn">Reset</button></div>
+      <p class="mini">For .ppkx and .gdb files, the browser sends the file to your backend function. The backend commits it to <code>data/raw/</code> and triggers the extractor.</p>
+      <div class="steps" id="steps">
+        <div class="step" data-step="file"><div class="badge">1</div><div><b>File selected</b><span>Waiting for a file.</span></div></div>
+        <div class="step" data-step="upload"><div class="badge">2</div><div><b>Upload to backend</b><span>Backend stores it in GitHub data/raw.</span></div></div>
+        <div class="step" data-step="build"><div class="badge">3</div><div><b>Build map data</b><span>GitHub Actions converts layers, polygons, and points.</span></div></div>
+        <div class="step" data-step="publish"><div class="badge">4</div><div><b>Published</b><span>Return to the map after the workflow succeeds.</span></div></div>
+      </div>
+    </section>
+    <aside class="card">
+      <h2>2. Backend connection</h2>
+      <div class="notice okbox">Best setup: deploy this site with the included backend function and set GitHub secrets as environment variables. Then users never paste a GitHub token into the browser.</div>
+      <label>Upload API endpoint</label><input id="uploadEndpoint" value="/api/upload" />
+      <label>Status API endpoint</label><input id="statusEndpoint" value="/api/status" />
+      <div class="row"><div><label>Repo owner</label><input id="owner" placeholder="sgoldnurseries" /></div><div><label>Repo name</label><input id="repo" placeholder="ArcGis" /></div></div>
+      <label>Branch</label><input id="branch" value="main" />
+      <div class="actions"><button id="savePrefs">Save settings</button><button id="checkBtn">Check build status</button></div>
+      <p class="mini">Settings are saved only in this browser. The backend should use env vars: <code>GITHUB_TOKEN</code>, <code>GITHUB_OWNER</code>, <code>GITHUB_REPO</code>, <code>GITHUB_BRANCH</code>.</p>
+      <h2 style="margin-top:18px">Build log</h2><div id="log" class="log">Ready.</div>
+    </aside>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);let picked=null;const allowed=['ppkx','mpkx','zip','geojson','json','kml','csv'];
+function log(msg){const el=$('log');el.textContent+=(el.textContent==='Ready.'?'':'\n')+`[${new Date().toLocaleTimeString()}] ${msg}`;el.scrollTop=el.scrollHeight}
+function setStep(name,state,msg){const el=document.querySelector(`[data-step="${name}"]`);el.classList.remove('active','done','fail');if(state)el.classList.add(state);if(msg)el.querySelector('span').textContent=msg}
+function prefs(){return{uploadEndpoint:$('uploadEndpoint').value.trim()||'/api/upload',statusEndpoint:$('statusEndpoint').value.trim()||'/api/status',owner:$('owner').value.trim(),repo:$('repo').value.trim(),branch:$('branch').value.trim()||'main'}}
+function savePrefs(){localStorage.setItem('sgnBuilderPrefs',JSON.stringify(prefs()));log('Saved builder settings in this browser.')}
+function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('sgnBuilderPrefs')||'{}');for(const k of ['uploadEndpoint','statusEndpoint','owner','repo','branch'])if(p[k]&&$(k))$(k).value=p[k]}catch(e){}}
+function pick(file){picked=file;if(!file)return;const ext=(file.name.split('.').pop()||'').toLowerCase();const ok=allowed.includes(ext);$('fileInfo').innerHTML=`<div class="fileRow"><div class="fileIcon">${ext.toUpperCase()}</div><div class="fileMeta"><b>${file.name}</b><small>${(file.size/1024/1024).toFixed(2)} MB • ${ok?'Ready':'Unsupported file type'}</small></div></div>`;$('uploadBtn').disabled=!ok;$('previewBtn').disabled=!['geojson','json','csv','kml'].includes(ext);setStep('file',ok?'done':'fail',ok?'File selected and validated.':'Unsupported file type.');log(`Selected ${file.name}`)}
+async function toBase64(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(file)})}
+async function uploadAndBuild(){if(!picked)return;const p=prefs();savePrefs();setStep('upload','active','Uploading to backend...');$('uploadBtn').disabled=true;try{const content=await toBase64(picked);const res=await fetch(p.uploadEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:picked.name,contentBase64:content,owner:p.owner,repo:p.repo,branch:p.branch})});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||res.statusText);setStep('upload','done','Uploaded into data/raw.');setStep('build','active','Build queued. Checking status...');log(data.message||'Upload completed. Build queued.');await pollStatus(true)}catch(e){setStep('upload','fail',e.message);log('Upload failed: '+e.message);$('uploadBtn').disabled=false}}
+async function checkStatus(){await pollStatus(false)}
+async function pollStatus(wait){const p=prefs();for(let i=0;i<(wait?36:1);i++){try{const url=new URL(p.statusEndpoint,location.href);if(p.owner)url.searchParams.set('owner',p.owner);if(p.repo)url.searchParams.set('repo',p.repo);if(p.branch)url.searchParams.set('branch',p.branch);const res=await fetch(url);const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||res.statusText);const line=`Workflow: ${data.status||'unknown'}${data.conclusion?' / '+data.conclusion:''}${data.html_url?' — '+data.html_url:''}`;log(line);if(data.status==='completed'){if(data.conclusion==='success'){setStep('build','done','Build completed successfully.');setStep('publish','done','Map data has been rebuilt.');setTimeout(()=>location.href='index.html?refresh='+Date.now(),1200);return}else{setStep('build','fail','Build failed. Open Actions log.');return}}}catch(e){log('Status check failed: '+e.message);if(!wait)return}await new Promise(r=>setTimeout(r,5000))}}
+function preview(){if(!picked)return;const ext=(picked.name.split('.').pop()||'').toLowerCase();if(['geojson','json','kml','csv'].includes(ext)){log('Browser preview selected. For publishing, use Upload + Build so the map data is saved into the repository.')}else log('Preview is only available for GeoJSON, JSON, KML, and CSV.')}
+const drop=$('drop');drop.onclick=()=>$('file').click();$('file').onchange=e=>pick(e.target.files[0]);['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));drop.addEventListener('drop',e=>pick(e.dataTransfer.files[0]));$('uploadBtn').onclick=uploadAndBuild;$('previewBtn').onclick=preview;$('resetBtn').onclick=()=>{picked=null;$('file').value='';$('fileInfo').innerHTML='';$('uploadBtn').disabled=true;$('previewBtn').disabled=true;['file','upload','build','publish'].forEach(s=>setStep(s,'','Waiting.'));$('log').textContent='Ready.'};$('savePrefs').onclick=savePrefs;$('checkBtn').onclick=checkStatus;loadPrefs();
+</script>
+</body>
+</html>
