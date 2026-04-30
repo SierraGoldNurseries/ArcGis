@@ -21,6 +21,16 @@ jobs:
           lfs: true
           fetch-depth: 0
 
+      - name: Install Git LFS
+        run: |
+          git lfs install
+
+      - name: Track generated large map files with Git LFS
+        run: |
+          git lfs track "data/map/*.geojson"
+          git lfs track "data/*.geojson"
+          git add .gitattributes
+
       - name: Show repo files
         run: |
           echo "Current folder:"
@@ -63,14 +73,18 @@ jobs:
           echo "Generated data/map files:"
           find data/map -maxdepth 2 -type f -print | sort || true
 
+          echo "File sizes:"
+          du -h data/map/* || true
+
           echo "Compatibility files:"
-          ls -la data/structures_polygons.geojson data/structures_points.geojson 2>/dev/null || true
+          ls -lh data/structures_polygons.geojson data/structures_points.geojson 2>/dev/null || true
 
       - name: Commit generated map data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          git add .gitattributes || true
           git add data/map || true
           git add data/structures_polygons.geojson || true
           git add data/structures_points.geojson || true
