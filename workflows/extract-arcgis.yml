@@ -1,0 +1,53 @@
+name: Build SGN Map Data
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/raw/**'
+      - 'tools/extract_project.py'
+      - '.github/workflows/extract-arcgis.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-map-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install GIS tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin python3-gdal p7zip-full
+          python3 - <<'PY'
+          from osgeo import gdal, ogr
+          print("GDAL", gdal.VersionInfo())
+          print("Drivers available")
+          print("OpenFileGDB:", bool(ogr.GetDriverByName("OpenFileGDB")))
+          print("FileGDB:", bool(ogr.GetDriverByName("FileGDB")))
+          PY
+
+      - name: Extract ArcGIS project packages
+        run: |
+          python3 tools/extract_project.py
+
+      - name: Show generated files
+        run: |
+          echo "Generated data/map:"
+          find data/map -maxdepth 2 -type f -print | sort
+          echo "Raw packages:"
+          find data/raw -maxdepth 1 -type f -print | sort
+
+      - name: Commit generated map data
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Build combined SGN map data"
+          file_pattern: data/map/* data/structures_polygons.geojson data/structures_points.geojson
