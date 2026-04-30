@@ -1,7 +1,9 @@
 {
   "projects": {
-    "Trees": 51222
+    "Structures / Yards": 1,
+    "Prune South": 16985
   },
-  "total_features": 51222,
-  "total_points": 51222
+  "total_boundary_features": 16986,
+  "total_label_points": 16986,
+  "note": "Individual tree/point layers are intentionally skipped. Only polygon/block boundaries are exported."
 }

@@ -24,23 +24,17 @@
       "opacity": 0.28,
       "point_mode": "normal"
     },
-    "Trees": {
-      "labels": false,
-      "visible": true,
-      "opacity": 0.18,
-      "point_mode": "cluster"
-    },
     "Prune North": {
-      "labels": false,
+      "labels": true,
       "visible": true,
       "opacity": 0.2,
-      "point_mode": "filtered"
+      "point_mode": "normal"
     },
     "Prune South": {
-      "labels": false,
+      "labels": true,
       "visible": true,
       "opacity": 0.2,
-      "point_mode": "filtered"
+      "point_mode": "normal"
     },
     "Block #23": {
       "labels": true,
