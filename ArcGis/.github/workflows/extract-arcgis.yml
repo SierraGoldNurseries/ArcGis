@@ -28,11 +28,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gdal-bin python3-gdal p7zip-full
 
+      - name: Test GDAL
+        run: |
           python3 - <<'PY'
           from osgeo import gdal, ogr
           print("GDAL:", gdal.VersionInfo())
-          print("OpenFileGDB driver:", bool(ogr.GetDriverByName("OpenFileGDB")))
-          print("FileGDB driver:", bool(ogr.GetDriverByName("FileGDB")))
+          print("OpenFileGDB:", bool(ogr.GetDriverByName("OpenFileGDB")))
+          print("FileGDB:", bool(ogr.GetDriverByName("FileGDB")))
           PY
 
       - name: Extract ArcGIS project packages
@@ -41,11 +43,8 @@ jobs:
 
       - name: Show generated files
         run: |
-          echo "Generated files in data/map:"
+          echo "data/map:"
           find data/map -maxdepth 2 -type f -print | sort || true
-
-          echo "Raw files in data/raw:"
-          find data/raw -maxdepth 1 -type f -print | sort || true
 
       - name: Commit generated map data
         run: |
@@ -57,7 +56,7 @@ jobs:
           git add data/structures_points.geojson || true
 
           if git diff --cached --quiet; then
-            echo "No generated map data changes to commit."
+            echo "No map data changes to commit."
           else
             git commit -m "Build combined SGN map data"
             git push
