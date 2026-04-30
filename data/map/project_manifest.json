@@ -93,7 +93,7 @@
       "name": "Irrigation",
       "color": "#2563eb",
       "default_visible": true,
-      "default_labels": false,
+      "default_labels": true,
       "feature_count": 204565,
       "layers": [
         {
@@ -6888,7 +6888,7 @@
       "name": "Prune North",
       "color": "#9333ea",
       "default_visible": true,
-      "default_labels": false,
+      "default_labels": true,
       "feature_count": 37519,
       "layers": [
         {
@@ -6928,7 +6928,7 @@
       "name": "Railroad South",
       "color": "#0f766e",
       "default_visible": true,
-      "default_labels": false,
+      "default_labels": true,
       "feature_count": 4891,
       "layers": [
         {
