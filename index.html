@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SGN Map App - Enterprise Fast Single File</title>
+  <title>SGN Map App - Enterprise Fast Single File v3</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -34,22 +34,23 @@
       <div class="quick"><button id="satBtn" class="active">Satellite</button><button id="streetBtn">Street</button><button id="fitBtn">Fit Core Blocks</button><button id="labelsBtn" class="active">Block Labels</button></div>
     </div>
     <div class="panel-body">
-      <div class="hint"><b>Single-file enterprise fast mode:</b> this replacement does not require <code>data/optimized</code> files. It loads <code>data/map/manifest.json</code>, then only block polygon files first.</div>
-      <div class="hint"><b>Labels:</b> only main block/project labels are shown. Tree names like Chandler, RX1, VX211, Clonal, and tree-space labels are never rendered as labels.</div>
-      <div class="hint"><b>Zoom rules:</b><br>Zoom &lt; 15: outlines only<br>15+: block labels<br>17+: irrigation can display<br>19+: click a block for detail</div>
+      <div class="hint"><b>Single-file enterprise fast mode:</b> this replacement does not require <code>data/optimized</code> files. It loads <code>data/map/manifest.json</code>, then only core polygon files first.</div>
+      <div class="hint"><b>Labels + colors restored:</b> core labels like <b>Can Yard</b>, <b>High Tunnels</b>, <b>Shadehouse</b>, <b>Zone</b>, <b>Railroad</b>, and main block names render again. Tree names like Chandler, RX1, VX211, and Clonal still never render as labels.</div>
+      <div class="hint"><b>Color rules:</b> A / B / C / D groups use consistent colors across areas, while other core areas use family colors.</div>
+      <div class="hint"><b>Zoom rules:</b><br>Zoom &lt; 15: outlines only<br>15+: core labels<br>17+: irrigation can display<br>19+: click a feature for detail</div>
       <div id="blockList" class="block-list"></div>
     </div>
   </aside>
   <div id="legend" class="legend"></div>
   <div id="status" class="status"></div>
   <script>
-    const DATA_VERSION = "single-file-fast-2026-04-30-v2";
+    const DATA_VERSION = "single-file-fast-2026-04-30-v3";
     const YUBA_GARDEN = [39.1404, -121.6176];
     const ZOOM_RULES = { BLOCK_LABELS:15, IRRIGATION:17, DETAIL:19 };
     const PIPE_COLORS = { 1:"#94a3b8",2:"#38bdf8",3:"#22c55e",4:"#f59e0b",5:"#fb923c",6:"#ef4444",8:"#8b5cf6",10:"#06b6d4",12:"#0f766e",15:"#1d4ed8",18:"#7c2d12",20:"#111827",unknown:"#64748b" };
     const PIPE_WIDTHS = { 1:2,2:2,3:2.5,4:3,5:3.5,6:4,8:5,10:5.5,12:6,15:7,18:8,20:9,unknown:3 };
     const $ = id => document.getElementById(id);
-    const state = { manifest:null, coreFeatures:[], coreProjects:[], coreLayer:null, selectedLayer:null, detailLayer:null, irrigationLayer:null, chemicalLayer:null, labels:[], showLabels:true, irrigationEnabled:false, chemicalsEnabled:false, query:"" };
+    const state = { manifest:null, coreFeatures:[], coreProjects:[], coreLayer:null, selectedLayer:null, selectedFeatureId:null, detailLayer:null, irrigationLayer:null, chemicalLayer:null, labels:[], showLabels:true, irrigationEnabled:false, chemicalsEnabled:false, query:"" };
 
     const map = L.map("map", { zoomControl:true, preferCanvas:true, renderer:L.canvas({ padding:0.35 }) }).setView(YUBA_GARDEN, 16);
     const satellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{ maxNativeZoom:19,maxZoom:22,attribution:"Tiles © Esri" }).addTo(map);
@@ -100,12 +101,54 @@
     function fileIsChemical(file, project){ const s=((project?.key||"")+" "+(project?.name||"")+" "+(file.path||"")+" "+(file.layerName||"")+" "+(file.layerKey||"")).toLowerCase(); return /chemical|pesticide|fertilizer|propane|gasoline|diesel|well|water_filter|access_and_exit|loading_area|acid_tank/.test(s) && !/label/.test(s); }
     function fileIsTreeDetail(file){ const s=((file.path||"")+" "+(file.layerName||"")+" "+(file.layerKey||"")).toLowerCase(); return /spaces|exportfeatures|tree|chandler|rx1|vx211|clonal|label_points|points/.test(s); }
     function bestLabelFromProject(project){ return project?.name || project?.key || "Block"; }
-    function bestLabel(props){ return props?._projectName || props?._project || props?.Name || props?.name || props?.Block || "Block"; }
-    function withProps(feature, project, file){ return Object.assign({}, feature, { properties:Object.assign({}, feature.properties||{}, { _project:project.key, _projectName:project.name, _layer:file.layerKey, _layerName:file.layerName, _path:file.path }) }); }
+    function cleanupLabel(v){ return String(v||"").replace(/\s+/g," ").trim(); }
+    function bestLabel(props){ return cleanupLabel(props?._featureLabel || props?._layerName || props?._projectName || props?._project || props?.Name || props?.name || props?.Block || "Block"); }
+    function featureFamily(label){
+      const s=(label||"").toLowerCase();
+      if(s.includes('can yard')) return 'canyard';
+      if(s.includes('high tunnels')) return 'hightunnels';
+      if(s.includes('shadehouse')) return 'shadehouse';
+      if(s.includes('cold frame')) return 'coldframe';
+      if(s.includes('four bay')) return 'fourbay';
+      if(s.includes('head house')) return 'headhouse';
+      if(s.includes('zone ')) return 'zone';
+      if(s.includes('railroad')) return 'railroad';
+      if(s.includes('prune')) return 'prune';
+      if(s.includes('block')) return 'block';
+      if(s.includes('office')) return 'office';
+      if(s.includes('lab')) return 'lab';
+      if(s.includes('shop')) return 'shop';
+      if(s.includes('solar')) return 'solar';
+      if(s.includes('pond')) return 'pond';
+      return 'other';
+    }
+    function featureSuffix(label){ const parts=cleanupLabel(label).split(' '); const last=(parts[parts.length-1]||'').toUpperCase(); return ['A','B','C','D'].includes(last) ? last : ''; }
+    function colorForFeatureLabel(label, project){
+      const suffix=featureSuffix(label);
+      if(suffix){ return ({A:'#3b82f6',B:'#10b981',C:'#f59e0b',D:'#ef4444'})[suffix] || '#0f766e'; }
+      const fam=featureFamily(label || project?.name || '');
+      return ({
+        canyard:'#06b6d4', hightunnels:'#8b5cf6', shadehouse:'#14b8a6', coldframe:'#f97316', fourbay:'#0ea5e9',
+        headhouse:'#0891b2', zone:'#84cc16', railroad:'#64748b', prune:'#a855f7', block:'#f59e0b', office:'#2563eb',
+        lab:'#ec4899', shop:'#78716c', solar:'#eab308', pond:'#0ea5e9', other: project?.color || '#0f766e'
+      })[fam] || (project?.color || '#0f766e');
+    }
+    function featureLabelFrom(project, file, feature){
+      const base=cleanupLabel(file?.layerName || feature?.properties?.Name || feature?.properties?.name || project?.name || 'Feature');
+      if(/^structures$/i.test(base)) return cleanupLabel(project?.name || base);
+      return base;
+    }
+    function shouldLabelFeature(label){
+      const s=(label||'').toLowerCase();
+      if(!s) return false;
+      if(/spaces exportfeatures|one one three zero eas merge|polygons(\s|$)|structures\s*\/\s*yards/.test(s)) return false;
+      return true;
+    }
+    function withProps(feature, project, file){ const fl=featureLabelFrom(project,file,feature); return Object.assign({}, feature, { properties:Object.assign({}, feature.properties||{}, { _project:project.key, _projectName:project.name, _layer:file.layerKey, _layerName:file.layerName, _path:file.path, _featureLabel:fl, _color:colorForFeatureLabel(fl, project), _family:featureFamily(fl), _suffix:featureSuffix(fl), _featureId:`${project.key}::${file.layerKey}::${(feature.properties&& (feature.properties.OBJECTID||feature.properties.objectid||feature.properties.id||feature.properties.fid)) || Math.random().toString(36).slice(2)}` }) }); }
     function centerOfFeature(f){ try{ const g=f.geometry;if(!g)return null;let coords=[];const collect=a=>Array.isArray(a[0])?a.forEach(collect):coords.push(a);collect(g.coordinates);let sx=0,sy=0,n=0;coords.forEach(c=>{if(Number.isFinite(c[0])&&Number.isFinite(c[1])){sx+=c[0];sy+=c[1];n++;}});return n?[sy/n,sx/n]:null;}catch(_){return null;} }
-    function popupHtml(f){ const p=f.properties||{}; return `<div class="popup"><h3>${escapeHtml(bestLabel(p))}</h3><div class="popup-grid"><b>Project</b><span>${escapeHtml(p._projectName||p._project||"")}</span><b>Layer</b><span>${escapeHtml(p._layerName||p._layer||"")}</span></div></div>`; }
+    function popupHtml(f){ const p=f.properties||{}; return `<div class="popup"><h3>${escapeHtml(bestLabel(p))}</h3><div class="popup-grid"><b>Project</b><span>${escapeHtml(p._projectName||p._project||"")}</span><b>Layer</b><span>${escapeHtml(p._layerName||p._layer||"")}</span><b>Color group</b><span>${escapeHtml(p._suffix ? (p._suffix+' group') : (p._family||'core'))}</span></div></div>`; }
     function noTreeNamePopup(f){ const p=f.properties||{}; return `<div class="popup"><h3>Tree / Detail Feature</h3><div class="popup-grid"><b>Block</b><span>${escapeHtml(p._projectName||p._project||"")}</span><b>Layer</b><span>${escapeHtml(p._layerName||p._layer||"")}</span></div></div>`; }
-    function coreStyle(f){ const color=f.properties?._color || "#0f766e"; return { color:"#0f172a", weight:2.25, opacity:.95, fillColor:color, fillOpacity:.15 }; }
+    function coreStyle(f){ const color=f.properties?._color || "#0f766e"; const selected=state.selectedFeatureId && f.properties && f.properties._featureId===state.selectedFeatureId; return { color:selected?"#0f172a":"#334155", weight:selected?3.4:2.1, opacity:selected?1:.92, fillColor:color, fillOpacity:selected?.34:.22 }; }
     function selectedStyle(){ return { color:"#0f766e", weight:4, opacity:1, fillColor:"#14b8a6", fillOpacity:.22, className:"selected-outline" }; }
 
     async function loadCore(){
@@ -113,7 +156,7 @@
       const projects=(state.manifest.projects||[]).filter(p=>!projectIsBlocked(p));
       state.coreProjects=[]; state.coreFeatures=[];
       let loaded=0, skipped=0;
-      status("Loading only core block polygons...");
+      status("Loading only core polygons and structure areas...");
       for(const project of projects){
         const files=(project.files||[]).filter(fileIsCorePolygon);
         if(!files.length){ skipped++; continue; }
@@ -136,9 +179,11 @@
     function addBlockLabels(){
       clearBlockLabels();
       if(!state.showLabels || map.getZoom()<ZOOM_RULES.BLOCK_LABELS) return;
-      for(const project of state.coreProjects){
-        const label=bestLabelFromProject(project); if(state.query && !label.toLowerCase().includes(state.query.toLowerCase())) continue;
-        const f=project._coreFeatures && project._coreFeatures[0]; const c=f?centerOfFeature(f):null; if(!c) continue;
+      const bounds=map.getBounds().pad(0.2);
+      for(const f of state.coreFeatures){
+        const label=bestLabel(f.properties||{}); if(!shouldLabelFeature(label)) continue;
+        if(state.query && !label.toLowerCase().includes(state.query.toLowerCase())) continue;
+        const c=centerOfFeature(f); if(!c || !bounds.contains(c)) continue;
         const icon=L.divIcon({className:"",html:`<div class="label">${escapeHtml(label)}</div>`});
         state.labels.push(L.marker(c,{icon,interactive:false,keyboard:false}).addTo(map));
       }
@@ -147,21 +192,22 @@
     function renderCore(){
       if(state.coreLayer) map.removeLayer(state.coreLayer);
       const features=state.coreFeatures.filter(f=>!state.query || bestLabel(f.properties||{}).toLowerCase().includes(state.query.toLowerCase()));
-      state.coreLayer=L.geoJSON({type:"FeatureCollection",features},{style:coreStyle,onEachFeature:(f,l)=>{l.bindPopup(popupHtml(f));l.on("click",()=>selectProject(f.properties._project));}}).addTo(map);
+      state.coreLayer=L.geoJSON({type:"FeatureCollection",features},{style:coreStyle,onEachFeature:(f,l)=>{l.bindPopup(popupHtml(f));l.on("click",()=>selectFeature(f.properties._featureId));}}).addTo(map);
       addBlockLabels(); buildBlockList();
     }
     function buildBlockList(){
-      const rows=state.coreProjects.filter(p=>!state.query || bestLabelFromProject(p).toLowerCase().includes(state.query.toLowerCase())).slice(0,100).map(p=>`<div class="block-row"><span>${escapeHtml(bestLabelFromProject(p))}</span><small>${escapeHtml(p.key)}</small><button data-project="${escapeHtml(p.key)}">Load Detail</button></div>`).join("");
-      $("blockList").innerHTML=rows || `<div class="hint">No matching blocks.</div>`;
-      document.querySelectorAll("[data-project]").forEach(btn=>btn.onclick=()=>selectProject(btn.dataset.project));
+      const rows=state.coreFeatures.filter(f=>!state.query || bestLabel(f.properties||{}).toLowerCase().includes(state.query.toLowerCase())).slice(0,150).map(f=>`<div class="block-row"><span>${escapeHtml(bestLabel(f.properties||{}))}</span><small>${escapeHtml(f.properties._suffix || f.properties._family || f.properties._project)}</small><button data-feature="${escapeHtml(f.properties._featureId)}">Load Detail</button></div>`).join("");
+      $("blockList").innerHTML=rows || `<div class="hint">No matching features.</div>`;
+      document.querySelectorAll("[data-feature]").forEach(btn=>btn.onclick=()=>selectFeature(btn.dataset.feature));
     }
-    async function selectProject(projectKey){
-      const project=state.coreProjects.find(p=>p.key===projectKey); if(!project) return;
-      if(state.selectedLayer) map.removeLayer(state.selectedLayer);
-      state.selectedLayer=L.geoJSON({type:"FeatureCollection",features:project._coreFeatures||[]},{style:selectedStyle}).addTo(map);
-      const b=state.selectedLayer.getBounds(); if(b.isValid()) map.fitBounds(b.pad(.18),{maxZoom:19});
-      if(map.getZoom()<ZOOM_RULES.DETAIL){ status("Zoom 19+ to show selected block detail. Tree names will still not label.",3600); return; }
-      await loadProjectDetails(project);
+    async function selectFeature(featureId){
+      const feature=state.coreFeatures.find(f=>f.properties && f.properties._featureId===featureId); if(!feature) return;
+      state.selectedFeatureId=featureId;
+      renderCore();
+      const temp=L.geoJSON({type:"FeatureCollection",features:[feature]});
+      const b=temp.getBounds(); if(b.isValid()) map.fitBounds(b.pad(.18),{maxZoom:19});
+      if(map.getZoom()<ZOOM_RULES.DETAIL){ status("Zoom 19+ to show selected feature detail. Tree names will still not label.",3600); return; }
+      const project=state.coreProjects.find(p=>p.key===feature.properties._project); if(project) await loadProjectDetails(project);
     }
     async function loadProjectDetails(project){
       const files=(project.files||[]).filter(f=>!fileIsCorePolygon(f) && !fileIsIrrigationLine(f,project) && !fileIsChemical(f,project));
@@ -232,8 +278,8 @@
       setupControls();
       try{
         await loadCore(); renderCore(); addBlockLabels();
-        $("subtitle").textContent=`${state.coreProjects.length.toLocaleString()} core block groups loaded • heavy layers deferred`;
-        status("Fast map ready: core blocks only. No optimized folder required.");
+        $("subtitle").textContent=`${state.coreFeatures.length.toLocaleString()} core areas loaded • heavy layers deferred`;
+        status("Fast map ready: core labels/colors restored. No optimized folder required.");
       }catch(err){
         console.error(err); $("subtitle").textContent="Map data missing or LFS files not downloaded";
         status(err.message, 9000);
