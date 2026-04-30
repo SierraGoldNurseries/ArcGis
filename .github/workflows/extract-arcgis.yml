@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: sgn-map-data-build
+  cancel-in-progress: false
+
 jobs:
   build-map-data:
     name: Extract ArcGIS PPKX files
@@ -20,28 +24,21 @@ jobs:
         with:
           lfs: true
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Git LFS
         run: |
           git lfs install
-
-      - name: Track generated large map files with Git LFS
-        run: |
+          git lfs track "data/map/**/*.geojson"
           git lfs track "data/map/*.geojson"
-          git lfs track "data/*.geojson"
-          git add .gitattributes
+          git add .gitattributes || true
 
       - name: Show repo files
         run: |
           echo "Current folder:"
           pwd
-
-          echo "Root files:"
-          ls -la
-
           echo "Raw project files:"
           find data/raw -maxdepth 1 -type f -print || true
-
           echo "Extractor:"
           ls -la tools || true
 
@@ -59,11 +56,6 @@ jobs:
           print("FileGDB driver:", bool(ogr.GetDriverByName("FileGDB")))
           PY
 
-      - name: Create output folders
-        run: |
-          mkdir -p data/map
-          mkdir -p data/raw
-
       - name: Run SGN ArcGIS extractor
         run: |
           python3 tools/extract_project.py
@@ -71,13 +63,9 @@ jobs:
       - name: List generated map data
         run: |
           echo "Generated data/map files:"
-          find data/map -maxdepth 2 -type f -print | sort || true
-
+          find data/map -maxdepth 4 -type f -print | sort || true
           echo "File sizes:"
-          du -h data/map/* || true
-
-          echo "Compatibility files:"
-          ls -lh data/structures_polygons.geojson data/structures_points.geojson 2>/dev/null || true
+          du -h data/map/**/* 2>/dev/null || true
 
       - name: Commit generated map data
         run: |
@@ -86,12 +74,21 @@ jobs:
 
           git add .gitattributes || true
           git add data/map || true
-          git add data/structures_polygons.geojson || true
-          git add data/structures_points.geojson || true
+
+          # remove old giant compatibility files if they still exist
+          git rm -f data/structures_points.geojson data/structures_polygons.geojson 2>/dev/null || true
+          git rm -f data/map/combined_points.geojson data/map/combined_polygons.geojson data/map/combined_lines.geojson 2>/dev/null || true
+          git rm -f data/map/structures_points.geojson data/map/structures_polygons.geojson 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No generated map data changes to commit."
-          else
-            git commit -m "Build combined SGN map data"
-            git push
+            exit 0
           fi
+
+          git commit -m "Build split SGN map data"
+
+          echo "Pulling latest main before push..."
+          git pull --rebase origin main
+
+          echo "Pushing generated split map data..."
+          git push origin HEAD:main
