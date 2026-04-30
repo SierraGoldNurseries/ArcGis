@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SGN Structures Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; font-family: Arial, sans-serif; }
+    .panel { position:absolute; z-index:1000; top:12px; left:12px; background:#fff; padding:12px; border-radius:12px; box-shadow:0 3px 18px #0005; width:350px; max-height:90%; overflow:auto; }
+    .panel h2 { margin:0 0 6px; font-size:20px; }
+    .panel p { margin: 6px 0; font-size:13px; }
+    .toolbar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:8px 0; font-size:13px; }
+    input[type="search"] { width:100%; padding:8px; border:1px solid #ccc; border-radius:8px; }
+    button, select { padding:6px 8px; border:1px solid #bbb; border-radius:8px; background:#fff; cursor:pointer; }
+    .result { font-size:12px; border-bottom:1px solid #eee; padding:5px; cursor:pointer; }
+    .result:hover { background:#f7f7f7; }
+    .popup td { border-bottom:1px solid #eee; padding:3px 5px; font-size:12px; vertical-align:top; }
+    .popup td:first-child { font-weight:bold; color:#333; }
+    .poly-label { background:rgba(255,255,255,.82); border:1px solid rgba(0,0,0,.35); border-radius:4px; padding:1px 4px; color:#111; font-weight:700; font-size:11px; line-height:1.15; text-align:center; white-space:nowrap; box-shadow:0 1px 3px #0005; transform:translate(-50%,-50%); pointer-events:none; }
+    .small-label { font-size:10px; padding:1px 3px; }
+    .leaflet-control-layers { border-radius:10px; }
+    .links { margin-top:8px; font-size:12px; }
+    .links a { color:#075a9b; text-decoration:none; margin-right:8px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="panel">
+    <h2>SGN Structures Map</h2>
+    <p>Polygons converted from the ArcGIS package. Labels use abbreviations when a full name would clutter a structure.</p>
+    <input id="q" type="search" placeholder="Search structures, yards, zones..." />
+    <div class="toolbar">
+      <label><input id="poly" type="checkbox" checked /> polygons</label>
+      <label><input id="pt" type="checkbox" checked /> points</label>
+      <label><input id="lbl" type="checkbox" checked /> labels</label>
+      <button id="fit">Fit</button>
+    </div>
+    <div class="toolbar">
+      <label>Label mode
+        <select id="labelMode">
+          <option value="smart" selected>smart</option>
+          <option value="short">abbrev.</option>
+          <option value="full">full</option>
+        </select>
+      </label>
+    </div>
+    <div id="count"></div>
+    <div id="results"></div>
+    <div class="links"><a href="import.html">Import project/export files</a><a href="README.md">README</a></div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map', {preferCanvas:true}).setView([39.059,-121.617], 16);
+
+    const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 22,
+      attribution: '&copy; OpenStreetMap contributors'
+    });
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 22,
+      attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+    });
+    satellite.addTo(map);
+
+    function esc(x){ return String(x ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+    function niceLabel(p){ return p.label_full || p.Polygon_Name || p.Name || p.label || p._layer || 'Feature'; }
+    function labelFor(p){
+      const mode = document.getElementById('labelMode').value;
+      if (mode === 'full') return niceLabel(p).replaceAll('_',' ');
+      if (mode === 'short') return p.label_short || niceLabel(p);
+      return p.label_display || p.label_short || niceLabel(p);
+    }
+    function popupHtml(p){
+      const keys = Object.keys(p).filter(k => p[k] != null && p[k] !== '' && !String(k).startsWith('Shape_')).slice(0,28);
+      return '<div class="popup"><table>' + keys.map(k => `<tr><td>${esc(k)}</td><td>${esc(p[k])}</td></tr>`).join('') + '</table></div>';
+    }
+    function polygonStyle(){ return {weight:2, color:'#0b5cad', fillColor:'#4aa3ff', fillOpacity:.22}; }
+    function pointStyle(){ return {radius:5, weight:2, color:'#111', fillColor:'#fff', fillOpacity:.95}; }
+    function onEachFeature(f,l){ l.bindPopup(popupHtml(f.properties || {})); }
+
+    const polygons = L.geoJSON(null, {style: polygonStyle, onEachFeature});
+    const points = L.geoJSON(null, {pointToLayer:(f,ll)=>L.circleMarker(ll, pointStyle()), onEachFeature});
+    const labels = L.layerGroup();
+    let pointData = [];
+
+    function buildLabels(){
+      labels.clearLayers();
+      if (!document.getElementById('lbl').checked) return;
+      for (const f of pointData) {
+        if (!f.geometry || !f.geometry.coordinates) continue;
+        const p = f.properties || {};
+        const c = f.geometry.coordinates;
+        const text = labelFor(p);
+        const area = Number(p.Shape_Area || 0);
+        const small = area < 2500 || String(text).length <= 4;
+        const icon = L.divIcon({className: 'poly-label' + (small ? ' small-label' : ''), html: esc(text), iconSize: null});
+        labels.addLayer(L.marker([c[1], c[0]], {icon, interactive:false}));
+      }
+    }
+
+    function refresh(){
+      const q = document.getElementById('q').value.toLowerCase();
+      const matches = pointData.filter(f => !q || JSON.stringify(f.properties || {}).toLowerCase().includes(q)).slice(0,100);
+      document.getElementById('count').textContent = `${pointData.length} structures / ${matches.length} listed`;
+      document.getElementById('results').innerHTML = matches.map((f,i) => {
+        const p = f.properties || {};
+        return `<div class="result" data-i="${i}"><b>${esc(labelFor(p))}</b> — ${esc(niceLabel(p))}<br>${esc(p._layer || '')}</div>`;
+      }).join('');
+      [...document.querySelectorAll('.result')].forEach((el,i) => el.onclick = () => {
+        const f = matches[i], c = f.geometry.coordinates;
+        map.setView([c[1], c[0]], 20);
+        L.popup().setLatLng([c[1], c[0]]).setContent(popupHtml(f.properties || {})).openOn(map);
+      });
+      buildLabels();
+    }
+
+    Promise.all([
+      fetch('data/structures_polygons.geojson').then(r => r.json()),
+      fetch('data/structures_points.geojson').then(r => r.json())
+    ]).then(([polyData, pointJson]) => {
+      polygons.addData(polyData).addTo(map);
+      points.addData(pointJson).addTo(map);
+      pointData = pointJson.features || [];
+      buildLabels(); labels.addTo(map);
+      const bounds = polygons.getBounds(); if (bounds.isValid()) map.fitBounds(bounds.pad(.15));
+      refresh();
+      L.control.layers({'Satellite': satellite, 'Street Map': street}, {'Polygons': polygons, 'Points': points, 'Labels': labels}, {collapsed:false}).addTo(map);
+    }).catch(err => alert('Could not load map data: ' + err.message));
+
+    q.oninput = refresh;
+    poly.onchange = e => e.target.checked ? polygons.addTo(map) : map.removeLayer(polygons);
+    pt.onchange = e => e.target.checked ? points.addTo(map) : map.removeLayer(points);
+    lbl.onchange = e => e.target.checked ? (buildLabels(), labels.addTo(map)) : map.removeLayer(labels);
+    labelMode.onchange = refresh;
+    fit.onclick = () => { const b = polygons.getBounds(); if (b.isValid()) map.fitBounds(b.pad(.15)); };
+  </script>
+</body>
+</html>
