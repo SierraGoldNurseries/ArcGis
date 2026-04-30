@@ -1,25 +1,101 @@
-// Vercel/Node serverless function.
-// Returns latest ArcGIS extractor workflow run status.
-// Required env vars: GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO. Optional: GITHUB_BRANCH=main.
+function send(res, status, data) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify(data));
+}
 
-const GH = 'https://api.github.com';
-module.exports = async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
+async function gh(path, token) {
+  const res = await fetch("https://api.github.com" + path, {
+    headers: {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer " + token,
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "sgn-map-import-status"
+    }
+  });
+
+  const text = await res.text();
+  let json = {};
   try {
-    const owner = process.env.GITHUB_OWNER || req.query.owner;
-    const repo = process.env.GITHUB_REPO || req.query.repo;
-    const branch = process.env.GITHUB_BRANCH || req.query.branch || 'main';
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) return res.status(500).json({ error: 'Server missing GITHUB_TOKEN env var' });
-    if (!owner || !repo) return res.status(400).json({ error: 'Missing owner/repo' });
-    const path = `/repos/${owner}/${repo}/actions/workflows/extract-arcgis.yml/runs?branch=${encodeURIComponent(branch)}&per_page=1`;
-    const r = await fetch(`${GH}${path}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
-    if (!r.ok) return res.status(r.status).json({ error: await r.text() });
-    const data = await r.json();
-    const run = data.workflow_runs && data.workflow_runs[0];
-    if (!run) return res.status(200).json({ status: 'none', conclusion: null });
-    return res.status(200).json({ status: run.status, conclusion: run.conclusion, html_url: run.html_url, updated_at: run.updated_at });
+    json = text ? JSON.parse(text) : {};
   } catch (err) {
-    return res.status(500).json({ error: err.message || String(err) });
+    json = { raw: text };
+  }
+
+  if (!res.ok) {
+    throw new Error(json.message || json.error || text || ("GitHub error " + res.status));
+  }
+
+  return json;
+}
+
+module.exports = async (req, res) => {
+  try {
+    if (req.method !== "GET" && req.method !== "POST") {
+      return send(res, 405, { ok: false, error: "Method not allowed" });
+    }
+
+    const body = req.method === "POST"
+      ? (typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {}))
+      : {};
+
+    const input = Object.assign({}, req.query || {}, body || {});
+    const adminPin = input.adminPin || req.headers["x-admin-pin"] || "";
+    const envPin = process.env.ADMIN_PIN || "";
+
+    if (envPin && adminPin !== envPin) {
+      return send(res, 401, { ok: false, error: "Invalid admin PIN" });
+    }
+
+    const owner = input.owner || process.env.GITHUB_OWNER;
+    const repo = input.repo || process.env.GITHUB_REPO;
+    const branch = input.branch || process.env.GITHUB_BRANCH || "main";
+    const workflow = input.workflow || "extract-arcgis.yml";
+
+    const token =
+      input.githubToken ||
+      input.token ||
+      req.headers["x-github-token"] ||
+      process.env.GITHUB_TOKEN ||
+      "";
+
+    if (!owner || !repo) {
+      return send(res, 400, { ok: false, error: "Missing owner or repo" });
+    }
+
+    if (!token) {
+      return send(res, 400, {
+        ok: false,
+        error: "Missing GitHub token. Paste it in the import page and click Save Settings, or set GITHUB_TOKEN in Vercel."
+      });
+    }
+
+    const runs = await gh(
+      "/repos/" + encodeURIComponent(owner) + "/" + encodeURIComponent(repo) +
+      "/actions/workflows/" + encodeURIComponent(workflow) +
+      "/runs?branch=" + encodeURIComponent(branch) + "&per_page=5",
+      token
+    );
+
+    const run = (runs.workflow_runs || [])[0] || null;
+
+    return send(res, 200, {
+      ok: true,
+      run: run ? {
+        id: run.id,
+        name: run.name,
+        status: run.status,
+        conclusion: run.conclusion,
+        html_url: run.html_url,
+        created_at: run.created_at,
+        updated_at: run.updated_at,
+        actor: run.actor ? run.actor.login : null
+      } : null
+    });
+  } catch (err) {
+    return send(res, 500, {
+      ok: false,
+      error: err.message || "Status endpoint failed"
+    });
   }
 };
