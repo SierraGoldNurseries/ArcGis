@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from osgeo import ogr, osr
@@ -20,27 +22,27 @@ except Exception as exc:
 ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = ROOT / "data" / "raw"
 MAP_DIR = ROOT / "data" / "map"
+PROJECTS_DIR = MAP_DIR / "projects"
 
-# Labels are now ON by default for all harvested projects.
 PROJECT_RULES = [
-    ("chemical", "Chemical Locations", "#dc2626", True, True),
-    ("irrigation", "Irrigation", "#2563eb", True, True),
-    ("owl", "Owl Boxes", "#7c3aed", True, True),
-    ("tree", "Trees", "#16a34a", True, True),
-    ("prune_north", "Prune North", "#9333ea", True, True),
-    ("prunenorth", "Prune North", "#9333ea", True, True),
-    ("prune_south", "Prune South", "#c026d3", True, True),
-    ("prunesouth", "Prune South", "#c026d3", True, True),
-    ("railroad_south", "Railroad South", "#0f766e", True, True),
-    ("railroadsouth", "Railroad South", "#0f766e", True, True),
-    ("block_#23", "Block #23", "#f59e0b", True, True),
-    ("block_23", "Block #23", "#f59e0b", True, True),
-    ("block23", "Block #23", "#f59e0b", True, True),
-    ("block_#25", "Block #25", "#ea580c", True, True),
-    ("block_25", "Block #25", "#ea580c", True, True),
-    ("block25", "Block #25", "#ea580c", True, True),
-    ("structure", "Structures / Yards", "#0f766e", True, True),
-    ("yard", "Structures / Yards", "#0f766e", True, True),
+    ("chemical", "chemical_locations", "Chemical Locations", "#dc2626", True, True),
+    ("irrigation", "irrigation", "Irrigation", "#2563eb", True, True),
+    ("owl", "owl_boxes", "Owl Boxes", "#7c3aed", True, True),
+    ("tree", "trees", "Trees", "#16a34a", True, True),
+    ("prune_north", "prune_north", "Prune North", "#9333ea", True, True),
+    ("prunenorth", "prune_north", "Prune North", "#9333ea", True, True),
+    ("prune_south", "prune_south", "Prune South", "#c026d3", True, True),
+    ("prunesouth", "prune_south", "Prune South", "#c026d3", True, True),
+    ("railroad_south", "railroad_south", "Railroad South", "#0f766e", True, True),
+    ("railroadsouth", "railroad_south", "Railroad South", "#0f766e", True, True),
+    ("block_#23", "block_23", "Block #23", "#f59e0b", True, True),
+    ("block_23", "block_23", "Block #23", "#f59e0b", True, True),
+    ("block23", "block_23", "Block #23", "#f59e0b", True, True),
+    ("block_#25", "block_25", "Block #25", "#ea580c", True, True),
+    ("block_25", "block_25", "Block #25", "#ea580c", True, True),
+    ("block25", "block_25", "Block #25", "#ea580c", True, True),
+    ("structure", "structures", "Structures / Yards", "#0f766e", True, True),
+    ("yard", "structures", "Structures / Yards", "#0f766e", True, True),
 ]
 
 COLOR_PALETTE = [
@@ -57,7 +59,6 @@ GENERIC_LABELS = {
     "area", "areas", "block", "blocks", "multipolygon", "multipolygons"
 }
 
-# Prefer these fields if present in the feature attributes.
 PREFERRED_LABEL_FIELDS = [
     "Name", "NAME", "name",
     "Label", "LABEL", "label",
@@ -69,8 +70,33 @@ PREFERRED_LABEL_FIELDS = [
     "Variety", "VARIETY", "variety",
     "Site", "SITE", "site",
     "AreaName", "AREANAME", "area_name",
-    "Description", "DESCRIPTION", "description",
-    "Layer", "LAYER", "layer"
+    "Description", "DESCRIPTION", "description"
+]
+
+# Derived/helper layers that should not be in the web map.
+SKIP_LAYER_TOKENS = [
+    "pointstoline",
+    "points_to_line",
+    "buffer",
+    "exporttable",
+    "export_table",
+    "mother_tree",
+    "vacant_export",
+    "occupied_export",
+    "sort",
+]
+
+# For Trees, keep real spacing point exports and basic tree/block polygons.
+# Skip duplicate XY table layers, buffers, points-to-line, and helper export tables.
+TREE_KEEP_POINT_TOKENS = [
+    "spaces_exportfeatures",
+    "space_exportfeatures",
+]
+TREE_KEEP_POLYGON_TOKENS = [
+    "polygon",
+    "polygons",
+    "orchard",
+    "block",
 ]
 
 
@@ -78,44 +104,44 @@ def log(msg: str) -> None:
     print(f"[extract] {msg}", flush=True)
 
 
-def clean(value: Any) -> str:
+def slug(value: Any) -> str:
     s = Path(str(value)).stem
     s = re.sub(r"[\s\-]+", "_", s)
     s = re.sub(r"[^A-Za-z0-9_#]+", "_", s)
     s = re.sub(r"_+", "_", s).strip("_")
-    return s or "unknown"
+    return s.lower() or "unknown"
 
 
-def human(value: str) -> str:
-    return clean(value).replace("_", " ")
+def display(value: Any) -> str:
+    return slug(value).replace("_", " ").title()
 
 
 def project_meta(path: Path) -> Dict[str, Any]:
-    key = clean(path.name).lower()
+    key = slug(path.name)
     compact = key.replace("_", "").replace("#", "")
-    for token, name, color, visible, labels in PROJECT_RULES:
+    for token, project_key, name, color, visible, labels in PROJECT_RULES:
         t1 = token.lower()
         t2 = t1.replace("_", "").replace("#", "")
         if t1 in key or t2 in compact:
             return {
-                "project": name,
-                "project_key": clean(name).lower(),
-                "project_color": color,
-                "default_visible": visible,
-                "default_labels": labels,
+                "key": project_key,
+                "name": name,
+                "color": color,
+                "defaultVisible": visible,
+                "defaultLabels": labels,
             }
     return {
-        "project": "Other",
-        "project_key": "other",
-        "project_color": "#64748b",
-        "default_visible": True,
-        "default_labels": True,
+        "key": "other",
+        "name": "Other",
+        "color": "#64748b",
+        "defaultVisible": True,
+        "defaultLabels": True,
     }
 
 
 def color_for(key: str) -> str:
     h = 0
-    for ch in key:
+    for ch in str(key):
         h = ((h << 5) - h + ord(ch)) & 0xFFFFFFFF
     return COLOR_PALETTE[h % len(COLOR_PALETTE)]
 
@@ -139,42 +165,41 @@ def best_label(props: Dict[str, Any], layer_name: str, project_name: str, fid: i
         if field in props and is_meaningful_label(props[field]):
             return str(props[field]).strip()
 
-    # Fallback: any useful name-ish field.
     for key, val in props.items():
         low = str(key).lower()
-        if any(token in low for token in ["name", "label", "block", "title", "site", "area", "orchard", "variety"]):
+        if any(token in low for token in ["name", "label", "block", "site", "area", "orchard", "variety"]):
             if is_meaningful_label(val):
                 return str(val).strip()
 
-    # If layer name is generic, do NOT label as "Polygons".
-    if clean(layer_name).lower() in GENERIC_LABELS:
-        # For block polygons, use project and fid so it isn't blank/generic.
+    clean_layer = slug(layer_name)
+    if clean_layer in GENERIC_LABELS:
         if project_name.lower().startswith("block"):
-            return f"{project_name} #{fid + 1}"
+            return f"{project_name} {fid + 1}"
         return ""
 
-    return human(layer_name)
+    return display(layer_name)
 
 
 def group_key(label: str, layer_name: str, project_name: str) -> str:
     base = label or layer_name or project_name
-    normalized = clean(base)
+    normalized = slug(base)
+    layer_slug = slug(layer_name)
 
     patterns = [
-        r"^(High_Tunnels_\d+)(?:_[A-Za-z])?$",
-        r"^(Can_Yard_\d+)(?:_[A-Za-z])?$",
-        r"^(Shade_House_\d+|Shadehouse_\d+)(?:_[A-Za-z])?$",
-        r"^(Cold_Frame_\d+)$",
-        r"^(Block_#?\d+).*$",
-        r"^(Four_Bays?_\d+)$",
+        r"^(high_tunnels_\d+)(?:_[a-z])?$",
+        r"^(can_yard_\d+)(?:_[a-z])?$",
+        r"^(shade_house_\d+|shadehouse_\d+)(?:_[a-z])?$",
+        r"^(cold_frame_\d+)$",
+        r"^(block_#?\d+).*$",
+        r"^(four_bays?_\d+)$",
     ]
-    for pat in patterns:
-        m = re.match(pat, normalized, flags=re.I)
-        if m:
-            return clean(m.group(1)).lower()
 
-    # Named blocks like Orange Tree, Hock East B, River North, etc. get separate colors.
-    return clean(base).lower()
+    for pat in patterns:
+        m = re.match(pat, layer_slug, flags=re.I)
+        if m:
+            return slug(m.group(1))
+
+    return normalized
 
 
 def extract_archive(src: Path, dst: Path) -> bool:
@@ -214,7 +239,7 @@ def spatial_transform(layer: ogr.Layer) -> Optional[osr.CoordinateTransformation
     return osr.CoordinateTransformation(src, dst)
 
 
-def geom_kind(flat_type: int) -> str:
+def geom_kind_from_type(flat_type: int) -> str:
     if flat_type in (ogr.wkbPolygon, ogr.wkbMultiPolygon):
         return "polygon"
     if flat_type in (ogr.wkbPoint, ogr.wkbMultiPoint):
@@ -224,11 +249,27 @@ def geom_kind(flat_type: int) -> str:
     return "other"
 
 
-def kind_from_geometry(geom: ogr.Geometry) -> str:
+def geom_kind_from_geom(geom: ogr.Geometry) -> str:
     if geom is None or geom.IsEmpty():
         return "other"
-    flat = ogr.GT_Flatten(geom.GetGeometryType())
-    return geom_kind(flat)
+    return geom_kind_from_type(ogr.GT_Flatten(geom.GetGeometryType()))
+
+
+def should_skip_layer(project_key: str, layer_name: str, kind: str) -> bool:
+    low = slug(layer_name)
+
+    if any(token in low for token in SKIP_LAYER_TOKENS):
+        return True
+
+    if project_key == "trees":
+        if kind == "line":
+            return True
+        if kind == "point":
+            return not any(token in low for token in TREE_KEEP_POINT_TOKENS)
+        if kind == "polygon":
+            return not any(token in low for token in TREE_KEEP_POLYGON_TOKENS)
+
+    return False
 
 
 def feature_to_geojson(feat: ogr.Feature, layer: ogr.Layer, transform: Optional[osr.CoordinateTransformation]) -> Optional[Dict[str, Any]]:
@@ -237,6 +278,7 @@ def feature_to_geojson(feat: ogr.Feature, layer: ogr.Layer, transform: Optional[
         return None
 
     geom = geom.Clone()
+
     if transform is not None:
         try:
             geom.Transform(transform)
@@ -250,6 +292,7 @@ def feature_to_geojson(feat: ogr.Feature, layer: ogr.Layer, transform: Optional[
 
     props: Dict[str, Any] = {}
     defn = layer.GetLayerDefn()
+
     for i in range(defn.GetFieldCount()):
         try:
             name = defn.GetFieldDefn(i).GetName()
@@ -258,27 +301,11 @@ def feature_to_geojson(feat: ogr.Feature, layer: ogr.Layer, transform: Optional[
         except Exception:
             pass
 
-    return {"type": "Feature", "geometry": geom_json, "properties": props}
-
-
-def point_from_feature(feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    try:
-        geom = ogr.CreateGeometryFromJson(json.dumps(feature["geometry"]))
-        if geom is None or geom.IsEmpty():
-            return None
-        try:
-            pt = geom.PointOnSurface()
-        except Exception:
-            pt = geom.Centroid()
-        if pt is None or pt.IsEmpty():
-            pt = geom.Centroid()
-        return {
-            "type": "Feature",
-            "geometry": json.loads(pt.ExportToJson()),
-            "properties": dict(feature["properties"]),
-        }
-    except Exception:
-        return None
+    return {
+        "type": "Feature",
+        "geometry": geom_json,
+        "properties": props
+    }
 
 
 def add_meta(
@@ -291,38 +318,63 @@ def add_meta(
     kind: str,
 ) -> Dict[str, Any]:
     props = feature.setdefault("properties", {})
-    label = best_label(props, layer_name, meta["project"], fid)
-    gkey = group_key(label, layer_name, meta["project"])
+    label = best_label(props, layer_name, meta["name"], fid)
+    gkey = group_key(label, layer_name, meta["name"])
     gcolor = color_for(gkey)
 
-    props["_project"] = meta["project"]
-    props["_project_key"] = meta["project_key"]
-    props["_project_color"] = meta["project_color"]
-    props["_default_visible"] = True
-    props["_default_labels"] = True
+    props["_project"] = meta["name"]
+    props["_project_key"] = meta["key"]
+    props["_project_color"] = meta["color"]
+    props["_default_visible"] = meta["defaultVisible"]
+    props["_default_labels"] = meta["defaultLabels"]
     props["_package"] = package_name
     props["_gdb"] = gdb_name
     props["_layer"] = layer_name
-    props["_layer_display"] = "" if clean(layer_name).lower() in GENERIC_LABELS else human(layer_name)
+    props["_layer_key"] = slug(layer_name)
+    props["_layer_display"] = "" if slug(layer_name) in GENERIC_LABELS else display(layer_name)
     props["_label"] = label
     props["_group_key"] = gkey
     props["_group_color"] = gcolor
     props["_fid"] = fid
     props["_geometry_kind"] = kind
-    props["_feature_key"] = f"{meta['project_key']}::{clean(layer_name).lower()}::{fid}"
+    props["_feature_key"] = f"{meta['key']}::{slug(layer_name)}::{fid}"
     return feature
+
+
+def geom_hash(feature: Dict[str, Any]) -> str:
+    raw = json.dumps(feature.get("geometry"), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def add_feature(
+    store: Dict[Tuple[str, str, str], List[Dict[str, Any]]],
+    seen: Dict[Tuple[str, str, str], set],
+    project_key: str,
+    layer_key: str,
+    kind: str,
+    feature: Dict[str, Any],
+) -> None:
+    key = (project_key, layer_key, kind)
+    h = geom_hash(feature)
+    if key not in seen:
+        seen[key] = set()
+    if h in seen[key]:
+        return
+    seen[key].add(h)
+    store.setdefault(key, []).append(feature)
 
 
 def read_gdb(
     gdb: Path,
     package_name: str,
     meta: Dict[str, Any],
-    polygons: List[Dict[str, Any]],
-    points: List[Dict[str, Any]],
-    lines: List[Dict[str, Any]],
+    store: Dict[Tuple[str, str, str], List[Dict[str, Any]]],
+    seen: Dict[Tuple[str, str, str], set],
     inventory: List[Dict[str, Any]],
+    skipped: List[Dict[str, Any]],
 ) -> None:
     log(f"Reading geodatabase: {gdb}")
+
     try:
         ds = ogr.Open(str(gdb), 0)
     except Exception as exc:
@@ -333,22 +385,35 @@ def read_gdb(
         log(f"WARNING: skipping unreadable geodatabase {gdb}")
         return
 
-    layer_count = ds.GetLayerCount()
-    if layer_count <= 0:
+    if ds.GetLayerCount() <= 0:
         log(f"WARNING: skipping empty geodatabase {gdb}")
         return
 
-    for i in range(layer_count):
+    for i in range(ds.GetLayerCount()):
         layer = ds.GetLayerByIndex(i)
         if layer is None:
             continue
 
         layer_name = layer.GetName() or ""
         low = layer_name.lower()
+
         if not layer_name or low.startswith("gdb_") or low in {"gdb_items", "gdb_itemtypes"}:
             continue
 
-        layer_kind = geom_kind(ogr.GT_Flatten(layer.GetGeomType()))
+        layer_kind = geom_kind_from_type(ogr.GT_Flatten(layer.GetGeomType()))
+        layer_key = slug(layer_name)
+
+        if should_skip_layer(meta["key"], layer_name, layer_kind):
+            skipped.append({
+                "package": package_name,
+                "project": meta["name"],
+                "gdb": gdb.name,
+                "layer": layer_name,
+                "geometry_kind": layer_kind,
+                "reason": "filtered_helper_or_duplicate_layer"
+            })
+            continue
+
         transform = spatial_transform(layer)
 
         try:
@@ -365,180 +430,204 @@ def read_gdb(
                 if gj is None:
                     continue
 
+                geom = feat.GetGeometryRef()
                 if layer_kind == "other":
-                    geom = feat.GetGeometryRef()
-                    kind = kind_from_geometry(geom)
+                    kind = geom_kind_from_geom(geom)
                 else:
                     kind = layer_kind
 
                 if kind == "other":
                     continue
 
+                if should_skip_layer(meta["key"], layer_name, kind):
+                    continue
+
                 fid = int(feat.GetFID()) if feat.GetFID() is not None else exported
                 gj = add_meta(gj, meta, package_name, gdb.name, layer_name, fid, kind)
 
-                if kind == "polygon":
-                    polygons.append(gj)
-                    pt = point_from_feature(gj)
-                    if pt is not None:
-                        pt = add_meta(pt, meta, package_name, gdb.name, layer_name, fid, "polygon_point")
-                        points.append(pt)
-                elif kind == "point":
-                    points.append(gj)
-                elif kind == "line":
-                    lines.append(gj)
-                    pt = point_from_feature(gj)
-                    if pt is not None:
-                        pt = add_meta(pt, meta, package_name, gdb.name, layer_name, fid, "line_point")
-                        points.append(pt)
-
+                add_feature(store, seen, meta["key"], layer_key, kind, gj)
                 exported += 1
+
         except Exception as exc:
             log(f"WARNING: layer partially skipped {layer_name}: {exc}")
 
         inventory.append({
             "package": package_name,
-            "project": meta["project"],
+            "project": meta["name"],
+            "project_key": meta["key"],
             "gdb": gdb.name,
             "layer": layer_name,
+            "layer_key": layer_key,
             "geometry_kind": layer_kind,
             "feature_count_reported": count_reported,
             "feature_count_exported": exported,
-            "default_visible": True,
-            "default_labels": True,
+            "default_visible": meta["defaultVisible"],
+            "default_labels": meta["defaultLabels"],
         })
 
-        log(f"  {meta['project']} / {layer_name}: {exported} feature(s)")
+        log(f"  {meta['name']} / {layer_name}: {exported} feature(s)")
 
 
 def write_geojson(path: Path, features: List[Dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"type": "FeatureCollection", "features": features}, ensure_ascii=False, separators=(",", ":")),
-        encoding="utf-8"
-    )
-    log(f"Wrote {path.relative_to(ROOT)} ({len(features)} features)")
+    obj = {
+        "type": "FeatureCollection",
+        "features": features
+    }
+    path.write_text(json.dumps(obj, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
-def write_inventory(path: Path, rows: List[Dict[str, Any]]) -> None:
-    fields = [
-        "package", "project", "gdb", "layer", "geometry_kind",
-        "feature_count_reported", "feature_count_exported",
-        "default_visible", "default_labels"
-    ]
+def write_csv(path: Path, rows: List[Dict[str, Any]], fields: List[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
-        w.writeheader()
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
         for row in rows:
-            w.writerow({k: row.get(k, "") for k in fields})
+            writer.writerow({field: row.get(field, "") for field in fields})
 
 
-def build_manifest(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
-    projects: Dict[str, Dict[str, Any]] = {}
-    for row in rows:
-        name = row["project"]
-        key = clean(name).lower()
-        if key not in projects:
-            color = next((rule[2] for rule in PROJECT_RULES if rule[1] == name), "#64748b")
-            projects[key] = {
+def build_and_write_outputs(
+    store: Dict[Tuple[str, str, str], List[Dict[str, Any]]],
+    inventory: List[Dict[str, Any]],
+    skipped: List[Dict[str, Any]],
+) -> None:
+    project_meta_map: Dict[str, Dict[str, Any]] = {}
+
+    for row in inventory:
+        key = row["project_key"]
+        if key not in project_meta_map:
+            color = "#64748b"
+            for _, rule_key, name, rule_color, visible, labels in PROJECT_RULES:
+                if rule_key == key:
+                    color = rule_color
+                    break
+            project_meta_map[key] = {
                 "key": key,
-                "name": name,
+                "name": row["project"],
                 "color": color,
-                "default_visible": True,
-                "default_labels": True,
-                "feature_count": 0,
-                "layers": [],
+                "defaultVisible": bool(row.get("default_visible", True)),
+                "defaultLabels": bool(row.get("default_labels", True)),
+                "files": [],
+                "featureCount": 0,
             }
-        projects[key]["feature_count"] += int(row.get("feature_count_exported") or 0)
-        projects[key]["layers"].append({
-            "layer": row["layer"],
-            "geometry_kind": row["geometry_kind"],
-            "feature_count": row["feature_count_exported"],
+
+    # Write one file per project/layer/kind.
+    for (project_key, layer_key, kind), features in sorted(store.items()):
+        if not features:
+            continue
+
+        file_name = f"{layer_key}_{kind}s.geojson"
+        rel_path = f"data/map/projects/{project_key}/{file_name}"
+        out_path = ROOT / rel_path
+
+        write_geojson(out_path, features)
+
+        project = project_meta_map.setdefault(project_key, {
+            "key": project_key,
+            "name": display(project_key),
+            "color": color_for(project_key),
+            "defaultVisible": True,
+            "defaultLabels": True,
+            "files": [],
+            "featureCount": 0,
         })
-    return {
-        "generated_by": "tools/extract_project.py",
-        "total_projects": len(projects),
-        "total_layers": len(rows),
-        "projects": list(projects.values()),
+
+        project["files"].append({
+            "type": kind,
+            "path": rel_path,
+            "layerKey": layer_key,
+            "layerName": display(layer_key),
+            "count": len(features)
+        })
+        project["featureCount"] += len(features)
+
+    manifest = {
+        "version": 2,
+        "mode": "split",
+        "generatedBy": "tools/extract_project.py",
+        "projects": sorted(project_meta_map.values(), key=lambda p: p["name"]),
+        "totals": {
+            "projects": len(project_meta_map),
+            "files": sum(len(p["files"]) for p in project_meta_map.values()),
+            "features": sum(p["featureCount"] for p in project_meta_map.values()),
+        }
     }
 
+    (MAP_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-def build_config(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
-    return {
-        "data_files": {
-            "polygons": "data/map/combined_polygons.geojson",
-            "points": "data/map/combined_points.geojson",
-            "lines": "data/map/combined_lines.geojson",
-            "manifest": "data/map/project_manifest.json",
-            "inventory": "data/map/layer_inventory.csv",
-        },
-        "project_defaults": {
-            "Structures / Yards": {"labels": True, "visible": True},
-            "Chemical Locations": {"labels": True, "visible": True},
-            "Irrigation": {"labels": True, "visible": True},
-            "Owl Boxes": {"labels": True, "visible": True},
-            "Trees": {"labels": True, "visible": True, "cluster": True, "search": True},
-            "Prune North": {"labels": True, "visible": True},
-            "Prune South": {"labels": True, "visible": True},
-            "Railroad South": {"labels": True, "visible": True},
-            "Block #23": {"labels": True, "visible": True, "opacity": 0.16},
-            "Block #25": {"labels": True, "visible": True, "opacity": 0.16},
-        },
-        "layers": rows,
-    }
+    inventory_fields = [
+        "package", "project", "project_key", "gdb", "layer", "layer_key",
+        "geometry_kind", "feature_count_reported", "feature_count_exported",
+        "default_visible", "default_labels"
+    ]
+
+    skipped_fields = ["package", "project", "gdb", "layer", "geometry_kind", "reason"]
+
+    write_csv(MAP_DIR / "layer_inventory.csv", inventory, inventory_fields)
+    write_csv(MAP_DIR / "skipped_layers.csv", skipped, skipped_fields)
+
+    log(f"Wrote split manifest with {manifest['totals']['files']} files and {manifest['totals']['features']} features.")
 
 
 def main() -> int:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    MAP_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Fresh map output each run so old giant combined files are removed.
+    if MAP_DIR.exists():
+        shutil.rmtree(MAP_DIR)
+    PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Remove old root compatibility files if present.
+    for old_file in [
+        ROOT / "data" / "structures_points.geojson",
+        ROOT / "data" / "structures_polygons.geojson",
+    ]:
+        try:
+            old_file.unlink()
+        except FileNotFoundError:
+            pass
 
     raw_files = sorted([
         p for p in RAW_DIR.iterdir()
         if p.is_file() and p.suffix.lower() in {".ppkx", ".mpkx", ".zip"}
     ])
-    direct_gdbs = sorted([p for p in RAW_DIR.iterdir() if p.is_dir() and p.suffix.lower() == ".gdb"])
 
-    polygons: List[Dict[str, Any]] = []
-    points: List[Dict[str, Any]] = []
-    lines: List[Dict[str, Any]] = []
+    direct_gdbs = sorted([
+        p for p in RAW_DIR.iterdir()
+        if p.is_dir() and p.suffix.lower() == ".gdb"
+    ])
+
+    store: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = {}
+    seen: Dict[Tuple[str, str, str], set] = {}
     inventory: List[Dict[str, Any]] = []
+    skipped: List[Dict[str, Any]] = []
 
     with tempfile.TemporaryDirectory(prefix="sgn_arcgis_extract_") as td:
         tmp = Path(td)
 
         for gdb in direct_gdbs:
-            read_gdb(gdb, gdb.name, project_meta(gdb), polygons, points, lines, inventory)
+            meta = project_meta(gdb)
+            read_gdb(gdb, gdb.name, meta, store, seen, inventory, skipped)
 
         for src in raw_files:
             meta = project_meta(src)
-            out = tmp / clean(src.name)
+            out = tmp / slug(src.name)
             out.mkdir(parents=True, exist_ok=True)
 
             if not extract_archive(src, out):
                 continue
 
             gdbs = find_gdbs(out)
+
             if not gdbs:
                 log(f"WARNING: no .gdb folders found inside {src.name}")
                 continue
 
             for gdb in gdbs:
-                read_gdb(gdb, src.name, meta, polygons, points, lines, inventory)
+                read_gdb(gdb, src.name, meta, store, seen, inventory, skipped)
 
-    write_geojson(MAP_DIR / "combined_polygons.geojson", polygons)
-    write_geojson(MAP_DIR / "combined_points.geojson", points)
-    write_geojson(MAP_DIR / "combined_lines.geojson", lines)
+    build_and_write_outputs(store, inventory, skipped)
 
-    # compatibility files
-    write_geojson(ROOT / "data" / "structures_polygons.geojson", polygons)
-    write_geojson(ROOT / "data" / "structures_points.geojson", points)
-
-    write_inventory(MAP_DIR / "layer_inventory.csv", inventory)
-    (MAP_DIR / "project_manifest.json").write_text(json.dumps(build_manifest(inventory), indent=2), encoding="utf-8")
-    (MAP_DIR / "map_config.json").write_text(json.dumps(build_config(inventory), indent=2), encoding="utf-8")
-
-    log(f"Done. Exported {len(polygons)} polygons, {len(points)} points, {len(lines)} lines.")
     return 0
 
 
