@@ -15,27 +15,21 @@
       --muted:#64748b;
       --border:#d8e0ec;
       --brand:#0f766e;
-      --shadow:0 12px 32px rgba(15,23,42,.12);
-      --radius:18px;
+      --shadow:0 12px 32px rgba(15,23,42,.14);
     }
     *{box-sizing:border-box}
     html,body,#map{height:100%;margin:0}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text);overflow:hidden;background:#0f172a}
     #map{width:100%;height:100%}
+
     .topbar{
       position:absolute;left:12px;right:12px;top:12px;z-index:1000;
-      display:flex;align-items:center;gap:10px;
-      pointer-events:none;
+      display:flex;align-items:center;gap:10px;pointer-events:none;
     }
     .brand{
-      display:flex;align-items:center;gap:10px;
-      background:rgba(255,255,255,.94);
-      border:1px solid var(--border);
-      box-shadow:var(--shadow);
-      border-radius:20px;
-      padding:8px 12px;
-      pointer-events:auto;
-      max-width:min(520px,calc(100vw - 24px));
+      display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.95);
+      border:1px solid var(--border);box-shadow:var(--shadow);border-radius:20px;
+      padding:8px 12px;pointer-events:auto;max-width:min(600px,calc(100vw - 24px));
     }
     .logo{
       width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#0f766e);
@@ -45,21 +39,16 @@
     .brand-sub{color:var(--muted);font-size:12px;font-weight:700;margin-top:2px}
     .top-actions{margin-left:auto;display:flex;gap:8px;pointer-events:auto}
     button,.button-link{
-      border:1px solid var(--border);
-      background:#fff;color:#0f172a;
-      border-radius:14px;
-      padding:10px 12px;
-      font-weight:900;
-      cursor:pointer;
-      box-shadow:0 6px 16px rgba(15,23,42,.09);
-      text-decoration:none;
-      font-size:13px;
-      white-space:nowrap;
+      border:1px solid var(--border);background:#fff;color:#0f172a;border-radius:14px;
+      padding:10px 12px;font-weight:900;cursor:pointer;box-shadow:0 6px 16px rgba(15,23,42,.09);
+      text-decoration:none;font-size:13px;white-space:nowrap;
     }
     button.primary,.button-link.primary{background:#0f766e;color:#fff;border-color:#0f766e}
+    button.active{background:#ecfeff;border-color:#67e8f9;color:#155e75}
+
     .panel{
-      position:absolute;left:12px;top:76px;bottom:14px;width:340px;z-index:1000;
-      background:rgba(255,255,255,.94);backdrop-filter:blur(16px);
+      position:absolute;left:12px;top:76px;bottom:14px;width:390px;z-index:1000;
+      background:rgba(255,255,255,.96);backdrop-filter:blur(16px);
       border:1px solid var(--border);box-shadow:var(--shadow);border-radius:22px;
       overflow:hidden;display:flex;flex-direction:column;
       transition:transform .22s ease,opacity .22s ease;
@@ -67,45 +56,38 @@
     .panel.collapsed{transform:translateX(calc(-100% - 20px));opacity:.15;pointer-events:none}
     .panel-head{padding:14px;border-bottom:1px solid var(--border)}
     .search{width:100%;height:42px;border:1px solid var(--border);border-radius:14px;padding:0 12px;font-weight:800;outline:none}
-    .quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-    .quick button{box-shadow:none;padding:10px 8px}
-    .quick button.active{background:#ecfeff;border-color:#67e8f9;color:#155e75}
+    .quick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+    .quick button{box-shadow:none;padding:10px 8px;font-size:12px}
     .panel-body{overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
-    .project-card{
-      border:1px solid var(--border);border-radius:18px;background:#fff;overflow:hidden;
-    }
-    .project-main{
-      display:flex;align-items:center;gap:9px;padding:11px 12px;cursor:pointer;
-    }
+
+    .project-card{border:1px solid var(--border);border-radius:18px;background:#fff;overflow:hidden}
+    .project-main{display:flex;align-items:center;gap:9px;padding:11px 12px;cursor:pointer}
     .swatch{width:14px;height:14px;border-radius:5px;border:1px solid rgba(15,23,42,.15);flex:0 0 14px}
     .project-name{font-weight:900;font-size:14px;line-height:1.1;flex:1;min-width:0}
     .project-count{font-size:11px;font-weight:900;color:#334155;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 8px}
     .project-controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:0 10px 10px}
     .project-controls button{box-shadow:none;padding:7px 6px;font-size:11px}
-    .layer-list{display:none;border-top:1px solid #eef2f7;padding:8px 10px 10px;background:#f8fafc}
+    .layer-list{display:none;border-top:1px solid #eef2f7;padding:8px 10px 10px;background:#f8fafc;max-height:230px;overflow:auto}
     .project-card.open .layer-list{display:block}
     .layer-row{font-size:12px;color:#475569;display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #eef2f7}
     .layer-row:last-child{border-bottom:none}
+
     .legend{
       position:absolute;right:12px;bottom:18px;z-index:1000;
       background:rgba(255,255,255,.94);border:1px solid var(--border);box-shadow:var(--shadow);
-      border-radius:18px;padding:10px 12px;max-width:min(360px,calc(100vw - 24px));
+      border-radius:18px;padding:10px 12px;max-width:min(520px,calc(100vw - 24px));
       display:flex;flex-wrap:wrap;gap:7px;
     }
     .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:900;color:#334155}
+
     .label{
       color:#0f172a;font-weight:900;font-size:12px;white-space:nowrap;
-      text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 4px #fff;
-      transform:translate(-50%,-50%);
-      pointer-events:none;
-      line-height:1.05;
-      text-align:center;
+      text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 5px #fff;
+      transform:translate(-50%,-50%);pointer-events:none;line-height:1.05;text-align:center;
     }
     .label.small{font-size:10px}
     .label.tiny{font-size:8px}
-    .point-dot{
-      width:13px;height:13px;border-radius:999px;border:2px solid #fff;box-shadow:0 1px 4px rgba(15,23,42,.35);
-    }
+
     .popup h3{margin:0 0 8px;font-size:15px}
     .popup-grid{display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:12px}
     .popup-grid b{color:#475569}
@@ -117,10 +99,9 @@
     .status.show{display:block}
     @media(max-width:800px){
       .brand-sub{display:none}
-      .panel{width:min(360px,calc(100vw - 20px));top:70px}
+      .panel{width:min(390px,calc(100vw - 20px));top:70px}
       .legend{display:none}
-      .top-actions{gap:5px}
-      button,.button-link{padding:9px 10px}
+      .quick{grid-template-columns:1fr 1fr}
     }
   </style>
 </head>
@@ -132,7 +113,7 @@
       <div class="logo">SGN</div>
       <div>
         <div class="brand-title">SGN Map App</div>
-        <div id="subtitle" class="brand-sub">Loading map data...</div>
+        <div id="subtitle" class="brand-sub">Loading split map data...</div>
       </div>
     </div>
     <div class="top-actions">
@@ -148,10 +129,10 @@
       <div class="quick">
         <button id="satBtn" class="active">Satellite</button>
         <button id="streetBtn">Street</button>
-        <button id="labelsBtn" class="active">Labels On</button>
-        <button id="pointsBtn" class="active">Points On</button>
-        <button id="polysBtn" class="active">Polygons On</button>
-        <button id="linesBtn" class="active">Lines On</button>
+        <button id="labelsBtn" class="active">Labels</button>
+        <button id="pointsBtn" class="active">Points</button>
+        <button id="polysBtn" class="active">Polygons</button>
+        <button id="linesBtn" class="active">Lines</button>
       </div>
     </div>
     <div id="projectList" class="panel-body"></div>
@@ -174,185 +155,47 @@
     ];
 
     const state = {
-      polygons: [],
-      points: [],
-      lines: [],
-      config: null,
-      manifest: null,
-      allFeatures: [],
-      projects: new Map(),
-      projectVisible: new Map(),
-      projectLabels: new Map(),
-      showLabels: true,
-      showPoints: true,
-      showPolygons: true,
-      showLines: true,
-      query: "",
-      labelMarkers: [],
-      polygonLayer: null,
-      pointLayer: null,
-      lineLayer: null,
-      base: "satellite"
+      manifest:null,
+      projects:[],
+      loaded:new Map(),
+      visible:new Map(),
+      labels:new Map(),
+      layers:new Map(),
+      labelMarkers:[],
+      query:"",
+      showLabels:true,
+      showPoints:true,
+      showPolygons:true,
+      showLines:true
     };
 
     const $ = id => document.getElementById(id);
 
-    const map = L.map("map", {
-      zoomControl: true,
-      preferCanvas: true
-    }).setView([36.78, -119.42], 15);
+    const map = L.map("map", { zoomControl:true, preferCanvas:true }).setView([36.78,-119.42],15);
 
     const satellite = L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      { maxNativeZoom: 19, maxZoom: 22, attribution: "Tiles © Esri" }
+      { maxNativeZoom:19, maxZoom:22, attribution:"Tiles © Esri" }
     ).addTo(map);
 
     const street = L.tileLayer(
       "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 22, attribution: "© OpenStreetMap" }
+      { maxZoom:22, attribution:"© OpenStreetMap" }
     );
 
     function status(msg, timeout=2200){
-      const el = $("status");
-      el.textContent = msg;
+      const el=$("status");
+      el.textContent=msg;
       el.classList.add("show");
       clearTimeout(el._t);
-      el._t = setTimeout(()=>el.classList.remove("show"), timeout);
+      el._t=setTimeout(()=>el.classList.remove("show"), timeout);
     }
 
-    async function loadJson(path, fallback=null){
-      const res = await fetch(path + "?v=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) {
-        if (fallback !== null) return fallback;
-        throw new Error(path + " returned " + res.status);
-      }
+    async function loadJson(path){
+      const res = await fetch(path + "?v=" + Date.now(), { cache:"no-store" });
+      if (!res.ok) throw new Error(path + " returned " + res.status);
       const text = await res.text();
-      try {
-        return JSON.parse(text);
-      } catch (err) {
-        throw new Error(path + " returned non-JSON");
-      }
-    }
-
-    function clean(v){
-      return String(v || "").trim();
-    }
-
-    function meaningful(v){
-      const s = clean(v);
-      if (!s) return false;
-      if (GENERIC_LABELS.has(s.toLowerCase())) return false;
-      if (/^[\d\W_]+$/.test(s)) return false;
-      return true;
-    }
-
-    function bestLabel(props){
-      const preferred = [
-        "_label","Name","NAME","name","Label","LABEL","label","Title","TITLE","title",
-        "Block","BLOCK","block","BlockName","BLOCKNAME","Block_Name","block_name",
-        "Orchard","ORCHARD","orchard","Variety","VARIETY","variety","Site","SITE","site",
-        "AreaName","AREANAME","area_name","Description","DESCRIPTION","description"
-      ];
-      for (const key of preferred) {
-        if (props && Object.prototype.hasOwnProperty.call(props, key) && meaningful(props[key])) {
-          return clean(props[key]);
-        }
-      }
-      if (props) {
-        for (const [key, value] of Object.entries(props)) {
-          const k = key.toLowerCase();
-          if ((k.includes("name") || k.includes("label") || k.includes("block") || k.includes("site") || k.includes("orchard") || k.includes("variety")) && meaningful(value)) {
-            return clean(value);
-          }
-        }
-      }
-      const layer = props?._layer || props?._layer_display;
-      if (meaningful(layer)) return String(layer).replace(/_/g, " ");
-      return "";
-    }
-
-    function projectName(feature){
-      return feature?.properties?._project || "Other";
-    }
-
-    function groupKey(feature){
-      const props = feature.properties || {};
-      let base = props._group_key || bestLabel(props) || props._layer || props._project || "other";
-      base = String(base).toLowerCase().replace(/[^a-z0-9#]+/g,"_").replace(/^_+|_+$/g,"");
-      if (!base) base = "other";
-
-      const layer = String(props._layer || "");
-      const m1 = layer.match(/^(High_Tunnels_\d+)(?:_[A-Za-z])?$/i);
-      if (m1) return m1[1].toLowerCase();
-      const m2 = layer.match(/^(Can_Yard_\d+)(?:_[A-Za-z])?$/i);
-      if (m2) return m2[1].toLowerCase();
-      const m3 = layer.match(/^(Shade_House_\d+|Shadehouse_\d+)(?:_[A-Za-z])?$/i);
-      if (m3) return m3[1].toLowerCase();
-      if (/^Four_Bays?_\d+$/i.test(layer)) return "four_bays";
-      return base;
-    }
-
-    function colorForKey(key){
-      let h = 0;
-      for (const ch of String(key)) h = ((h << 5) - h + ch.charCodeAt(0)) >>> 0;
-      return COLORS[h % COLORS.length];
-    }
-
-    function colorForFeature(feature){
-      return feature?.properties?._group_color || colorForKey(groupKey(feature));
-    }
-
-    function projectColor(project){
-      let h = 0;
-      for (const ch of String(project)) h = ((h << 5) - h + ch.charCodeAt(0)) >>> 0;
-      return COLORS[h % COLORS.length];
-    }
-
-    function featureCenter(feature){
-      try {
-        if (feature.geometry && feature.geometry.type === "Point") {
-          const c = feature.geometry.coordinates;
-          return [c[1], c[0]];
-        }
-        const pt = turf.pointOnFeature(feature);
-        return [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
-      } catch (e) {
-        try {
-          const c = turf.center(feature).geometry.coordinates;
-          return [c[1], c[0]];
-        } catch (_) {
-          return null;
-        }
-      }
-    }
-
-    function areaText(feature){
-      try {
-        const sqm = turf.area(feature);
-        if (!Number.isFinite(sqm) || sqm <= 0) return "";
-        const ac = sqm * 0.000247105;
-        return ac.toFixed(2) + " ac";
-      } catch(e) {
-        return "";
-      }
-    }
-
-    function popupHtml(feature){
-      const props = feature.properties || {};
-      const label = bestLabel(props) || "Feature";
-      const center = featureCenter(feature);
-      const coords = center ? center[0].toFixed(6) + ", " + center[1].toFixed(6) : "";
-      const area = feature.geometry && /Polygon/i.test(feature.geometry.type) ? areaText(feature) : "";
-      return `
-        <div class="popup">
-          <h3>${escapeHtml(label)}</h3>
-          <div class="popup-grid">
-            <b>Project</b><span>${escapeHtml(projectName(feature))}</span>
-            <b>Layer</b><span>${escapeHtml(props._layer_display || props._layer || "")}</span>
-            ${area ? `<b>Area</b><span>${escapeHtml(area)}</span>` : ""}
-            ${coords ? `<b>Coords</b><span>${escapeHtml(coords)}</span>` : ""}
-          </div>
-        </div>`;
+      return JSON.parse(text);
     }
 
     function escapeHtml(v){
@@ -361,312 +204,450 @@
       }[s]));
     }
 
-    function shouldShowFeature(feature){
-      const p = projectName(feature);
-      if (state.projectVisible.has(p) && !state.projectVisible.get(p)) return false;
-      if (!state.query) return true;
-
-      const props = feature.properties || {};
-      const hay = [
-        projectName(feature), bestLabel(props), props._layer, props._layer_display, props._gdb, props._package
-      ].join(" ").toLowerCase();
-
-      return hay.includes(state.query.toLowerCase());
-    }
-
-    function shouldLabelFeature(feature){
-      if (!state.showLabels) return false;
-      const p = projectName(feature);
-      if (state.projectLabels.has(p) && !state.projectLabels.get(p)) return false;
-      const label = bestLabel(feature.properties || {});
-      if (!meaningful(label)) return false;
-
-      // Avoid label overload from very dense tree point layers until zoomed in.
-      const project = p.toLowerCase();
-      if (project.includes("tree") && map.getZoom() < 19) return false;
+    function meaningful(v){
+      const s=String(v ?? "").trim();
+      if (!s) return false;
+      if (GENERIC_LABELS.has(s.toLowerCase())) return false;
+      if (/^[\d\W_]+$/.test(s)) return false;
       return true;
     }
 
-    function labelClass(feature){
-      try {
-        const a = turf.area(feature);
-        if (a > 20000) return "";
-        if (a > 5000) return "small";
-        return "tiny";
-      } catch (e) {
-        return "tiny";
+    function bestLabel(props){
+      const keys=[
+        "_label","Name","NAME","name","Label","LABEL","label","Title","TITLE","title",
+        "Block","BLOCK","block","BlockName","BLOCKNAME","Block_Name","block_name",
+        "Orchard","ORCHARD","orchard","Variety","VARIETY","variety","Site","SITE","site",
+        "AreaName","AREANAME","area_name","Description","DESCRIPTION","description"
+      ];
+      for (const k of keys){
+        if (props && Object.prototype.hasOwnProperty.call(props,k) && meaningful(props[k])) return String(props[k]).trim();
       }
+      if (props){
+        for (const [k,v] of Object.entries(props)){
+          const low=k.toLowerCase();
+          if ((low.includes("name") || low.includes("label") || low.includes("block") || low.includes("site") || low.includes("orchard")) && meaningful(v)) {
+            return String(v).trim();
+          }
+        }
+      }
+      return "";
+    }
+
+    function featureCenter(feature){
+      try{
+        if (feature.geometry && feature.geometry.type === "Point"){
+          const c=feature.geometry.coordinates;
+          return [c[1],c[0]];
+        }
+        const pt=turf.pointOnFeature(feature);
+        return [pt.geometry.coordinates[1],pt.geometry.coordinates[0]];
+      }catch(e){
+        try{
+          const c=turf.center(feature).geometry.coordinates;
+          return [c[1],c[0]];
+        }catch(_){
+          return null;
+        }
+      }
+    }
+
+    function colorForFeature(f){
+      return f?.properties?._group_color || colorForKey(f?.properties?._group_key || f?.properties?._project || "other");
+    }
+
+    function colorForKey(key){
+      let h=0;
+      for (const ch of String(key)) h=((h<<5)-h+ch.charCodeAt(0))>>>0;
+      return COLORS[h % COLORS.length];
+    }
+
+    function areaText(f){
+      try{
+        const sqm=turf.area(f);
+        if (!Number.isFinite(sqm) || sqm <= 0) return "";
+        return (sqm*0.000247105).toFixed(2) + " ac";
+      }catch(e){
+        return "";
+      }
+    }
+
+    function popupHtml(f){
+      const p=f.properties || {};
+      const label=bestLabel(p) || p._layer_display || p._project || "Feature";
+      const center=featureCenter(f);
+      const coords=center ? center[0].toFixed(6)+", "+center[1].toFixed(6) : "";
+      const area=f.geometry && /Polygon/i.test(f.geometry.type) ? areaText(f) : "";
+      return `
+        <div class="popup">
+          <h3>${escapeHtml(label)}</h3>
+          <div class="popup-grid">
+            <b>Project</b><span>${escapeHtml(p._project || "")}</span>
+            <b>Layer</b><span>${escapeHtml(p._layer_display || p._layer || "")}</span>
+            ${area ? `<b>Area</b><span>${escapeHtml(area)}</span>` : ""}
+            ${coords ? `<b>Coords</b><span>${escapeHtml(coords)}</span>` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function fileTypeVisible(type){
+      if (type === "point") return state.showPoints;
+      if (type === "polygon") return state.showPolygons;
+      if (type === "line") return state.showLines;
+      return true;
+    }
+
+    function featurePassesSearch(f){
+      if (!state.query) return true;
+      const p=f.properties || {};
+      const hay=[
+        p._project,p._layer,p._layer_display,p._label,bestLabel(p),p._gdb,p._package
+      ].join(" ").toLowerCase();
+      return hay.includes(state.query.toLowerCase());
+    }
+
+    function clearProjectLayers(projectKey){
+      const layers=state.layers.get(projectKey) || [];
+      layers.forEach(layer => map.removeLayer(layer));
+      state.layers.set(projectKey, []);
+      clearLabels();
     }
 
     function clearLabels(){
       state.labelMarkers.forEach(m => map.removeLayer(m));
-      state.labelMarkers = [];
+      state.labelMarkers=[];
     }
 
-    function renderLabels(features){
+    function labelClass(f){
+      try{
+        const a=turf.area(f);
+        if (a>20000) return "";
+        if (a>5000) return "small";
+        return "tiny";
+      }catch(e){
+        return "tiny";
+      }
+    }
+
+    function renderLabels(){
       clearLabels();
       if (!state.showLabels) return;
 
-      const used = new Set();
-      for (const feature of features) {
-        if (!shouldLabelFeature(feature)) continue;
+      const used=new Set();
 
-        const props = feature.properties || {};
-        const label = bestLabel(props);
-        if (!label) continue;
+      for (const project of state.projects){
+        if (!state.visible.get(project.key)) continue;
+        if (!state.labels.get(project.key)) continue;
 
-        const center = featureCenter(feature);
-        if (!center) continue;
+        const loaded=state.loaded.get(project.key);
+        if (!loaded) continue;
 
-        // De-dupe labels near same rounded coordinate.
-        const key = label.toLowerCase() + "|" + center[0].toFixed(5) + "|" + center[1].toFixed(5);
-        if (used.has(key)) continue;
-        used.add(key);
+        for (const file of loaded.files){
+          for (const f of file.features){
+            if (!featurePassesSearch(f)) continue;
+            const label=bestLabel(f.properties || {});
+            if (!meaningful(label)) continue;
 
-        const cls = labelClass(feature);
-        const icon = L.divIcon({
-          className: "",
-          html: `<div class="label ${cls}">${escapeHtml(label)}</div>`
-        });
-        const m = L.marker(center, { icon, interactive:false, keyboard:false });
-        m.addTo(map);
-        state.labelMarkers.push(m);
-      }
-    }
+            const projectName=(f.properties?._project || "").toLowerCase();
 
-    function renderLayers(){
-      if (state.polygonLayer) map.removeLayer(state.polygonLayer);
-      if (state.pointLayer) map.removeLayer(state.pointLayer);
-      if (state.lineLayer) map.removeLayer(state.lineLayer);
-      clearLabels();
+            // Tree labels only at close zoom, but tree dots still show.
+            if (projectName.includes("tree") && map.getZoom() < 20) continue;
 
-      const visiblePolys = state.polygons.filter(shouldShowFeature);
-      const visiblePoints = state.points.filter(shouldShowFeature);
-      const visibleLines = state.lines.filter(shouldShowFeature);
+            const center=featureCenter(f);
+            if (!center) continue;
 
-      if (state.showPolygons) {
-        state.polygonLayer = L.geoJSON({ type:"FeatureCollection", features:visiblePolys }, {
-          style: f => ({
-            color: colorForFeature(f),
-            weight: 2,
-            opacity: .95,
-            fillColor: colorForFeature(f),
-            fillOpacity: projectName(f).toLowerCase().startsWith("block") ? .22 : .30
-          }),
-          onEachFeature: (f, layer) => layer.bindPopup(popupHtml(f))
-        }).addTo(map);
-      }
+            const key=label.toLowerCase()+"|"+center[0].toFixed(5)+"|"+center[1].toFixed(5);
+            if (used.has(key)) continue;
+            used.add(key);
 
-      if (state.showLines) {
-        state.lineLayer = L.geoJSON({ type:"FeatureCollection", features:visibleLines }, {
-          style: f => ({
-            color: colorForFeature(f),
-            weight: 3,
-            opacity: .95
-          }),
-          onEachFeature: (f, layer) => layer.bindPopup(popupHtml(f))
-        }).addTo(map);
-      }
-
-      if (state.showPoints) {
-        state.pointLayer = L.geoJSON({ type:"FeatureCollection", features:visiblePoints }, {
-          pointToLayer: (f, latlng) => {
-            const color = colorForFeature(f);
-            const p = projectName(f).toLowerCase();
-            const r = p.includes("tree") ? 3 : 6;
-            return L.circleMarker(latlng, {
-              radius: r,
-              color: "#fff",
-              weight: p.includes("tree") ? 1 : 2,
-              fillColor: color,
-              fillOpacity: p.includes("tree") ? .70 : 1
+            const icon=L.divIcon({
+              className:"",
+              html:`<div class="label ${labelClass(f)}">${escapeHtml(label)}</div>`
             });
-          },
-          onEachFeature: (f, layer) => layer.bindPopup(popupHtml(f))
-        }).addTo(map);
-      }
 
-      // Label polygons/lines and sparse points. Dense tree labels only at high zoom.
-      renderLabels([...visiblePolys, ...visibleLines, ...visiblePoints]);
-      updateSubtitle(visiblePolys.length, visiblePoints.length, visibleLines.length);
-    }
-
-    function updateSubtitle(polyCount, pointCount, lineCount){
-      $("subtitle").textContent = `${polyCount.toLocaleString()} polygons • ${pointCount.toLocaleString()} points • ${lineCount.toLocaleString()} lines loaded`;
-    }
-
-    function buildProjects(){
-      state.projects.clear();
-      for (const f of [...state.polygons, ...state.points, ...state.lines]) {
-        const p = projectName(f);
-        if (!state.projects.has(p)) {
-          state.projects.set(p, { name:p, count:0, layers:new Map(), color: projectColor(p) });
-          state.projectVisible.set(p, true);
-          state.projectLabels.set(p, true);
+            const marker=L.marker(center,{icon,interactive:false,keyboard:false}).addTo(map);
+            state.labelMarkers.push(marker);
+          }
         }
-        const obj = state.projects.get(p);
-        obj.count += 1;
-        const layer = f.properties?._layer_display || f.properties?._layer || "Features";
-        obj.layers.set(layer, (obj.layers.get(layer) || 0) + 1);
       }
     }
 
-    function renderProjectList(){
-      const list = $("projectList");
-      const items = [...state.projects.values()].sort((a,b)=>a.name.localeCompare(b.name));
+    async function loadProject(project){
+      if (state.loaded.has(project.key)) return state.loaded.get(project.key);
 
-      list.innerHTML = items.map(p => `
-        <div class="project-card" data-project="${escapeHtml(p.name)}">
-          <div class="project-main" data-toggle="${escapeHtml(p.name)}">
-            <span class="swatch" style="background:${p.color}"></span>
-            <span class="project-name">${escapeHtml(p.name)}</span>
-            <span class="project-count">${p.count.toLocaleString()}</span>
+      status("Loading " + project.name + "...", 4000);
+
+      const files=[];
+      for (const file of project.files){
+        const data=await loadJson(file.path);
+        files.push({
+          meta:file,
+          features:data.features || []
+        });
+      }
+
+      const loaded={ files };
+      state.loaded.set(project.key, loaded);
+      return loaded;
+    }
+
+    async function renderProject(project){
+      clearProjectLayers(project.key);
+      if (!state.visible.get(project.key)) return;
+
+      const loaded=await loadProject(project);
+      const layers=[];
+
+      for (const file of loaded.files){
+        const type=file.meta.type;
+        if (!fileTypeVisible(type)) continue;
+
+        const features=file.features.filter(featurePassesSearch);
+        if (!features.length) continue;
+
+        const fc={ type:"FeatureCollection", features };
+
+        if (type === "polygon"){
+          const layer=L.geoJSON(fc,{
+            style:f=>({
+              color:"#111827",
+              weight:2.6,
+              opacity:.98,
+              fillColor:colorForFeature(f),
+              fillOpacity:.28
+            }),
+            onEachFeature:(f,l)=>l.bindPopup(popupHtml(f))
+          }).addTo(map);
+          layers.push(layer);
+        }
+
+        if (type === "line"){
+          const layer=L.geoJSON(fc,{
+            style:f=>({
+              color:"#111827",
+              weight:4,
+              opacity:.90
+            }),
+            onEachFeature:(f,l)=>l.bindPopup(popupHtml(f))
+          }).addTo(map);
+          layers.push(layer);
+        }
+
+        if (type === "point"){
+          const layer=L.geoJSON(fc,{
+            pointToLayer:(f,latlng)=>{
+              const projectName=(f.properties?._project || "").toLowerCase();
+              const r=projectName.includes("tree") ? 2.5 : 6;
+              return L.circleMarker(latlng,{
+                radius:r,
+                color:"#111827",
+                weight:projectName.includes("tree") ? .7 : 1.5,
+                fillColor:colorForFeature(f),
+                fillOpacity:projectName.includes("tree") ? .65 : 1
+              });
+            },
+            onEachFeature:(f,l)=>l.bindPopup(popupHtml(f))
+          }).addTo(map);
+          layers.push(layer);
+        }
+      }
+
+      state.layers.set(project.key, layers);
+      renderLabels();
+    }
+
+    async function renderAll(){
+      for (const project of state.projects){
+        await renderProject(project);
+      }
+      updateSubtitle();
+      renderLabels();
+    }
+
+    function updateSubtitle(){
+      let loadedFeatures=0;
+      for (const loaded of state.loaded.values()){
+        for (const file of loaded.files) loadedFeatures += file.features.length;
+      }
+      $("subtitle").textContent =
+        `${state.projects.length} projects • ${loadedFeatures.toLocaleString()} loaded features`;
+    }
+
+    function buildPanel(){
+      const list=$("projectList");
+
+      list.innerHTML=state.projects.map(project=>`
+        <div class="project-card" data-project="${escapeHtml(project.key)}">
+          <div class="project-main" data-toggle="${escapeHtml(project.key)}">
+            <span class="swatch" style="background:${project.color}"></span>
+            <span class="project-name">${escapeHtml(project.name)}</span>
+            <span class="project-count">${project.featureCount.toLocaleString()}</span>
           </div>
           <div class="project-controls">
-            <button data-visible="${escapeHtml(p.name)}">Visible</button>
-            <button data-labels="${escapeHtml(p.name)}">Labels</button>
-            <button data-zoom="${escapeHtml(p.name)}">Zoom</button>
+            <button data-visible="${escapeHtml(project.key)}">${state.visible.get(project.key) ? "Visible" : "Hidden"}</button>
+            <button data-labels="${escapeHtml(project.key)}">${state.labels.get(project.key) ? "Labels" : "No Labels"}</button>
+            <button data-zoom="${escapeHtml(project.key)}">Zoom</button>
           </div>
           <div class="layer-list">
-            ${[...p.layers.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([layer,count]) => `
-              <div class="layer-row"><span>${escapeHtml(layer || "Features")}</span><b>${count.toLocaleString()}</b></div>
+            ${project.files.map(f=>`
+              <div class="layer-row"><span>${escapeHtml(f.layerName || f.layerKey || f.type)}</span><b>${Number(f.count || 0).toLocaleString()}</b></div>
             `).join("")}
           </div>
         </div>
       `).join("");
 
-      list.querySelectorAll("[data-toggle]").forEach(el => {
-        el.onclick = () => el.closest(".project-card").classList.toggle("open");
+      list.querySelectorAll("[data-toggle]").forEach(el=>{
+        el.onclick=()=>el.closest(".project-card").classList.toggle("open");
       });
-      list.querySelectorAll("[data-visible]").forEach(el => {
-        el.onclick = () => {
-          const p = el.dataset.visible;
-          state.projectVisible.set(p, !state.projectVisible.get(p));
-          el.textContent = state.projectVisible.get(p) ? "Visible" : "Hidden";
-          renderLayers();
+
+      list.querySelectorAll("[data-visible]").forEach(el=>{
+        el.onclick=async()=>{
+          const key=el.dataset.visible;
+          state.visible.set(key,!state.visible.get(key));
+          el.textContent=state.visible.get(key) ? "Visible" : "Hidden";
+          const project=state.projects.find(p=>p.key===key);
+          await renderProject(project);
+          renderLegend();
         };
       });
-      list.querySelectorAll("[data-labels]").forEach(el => {
-        el.onclick = () => {
-          const p = el.dataset.labels;
-          state.projectLabels.set(p, !state.projectLabels.get(p));
-          el.textContent = state.projectLabels.get(p) ? "Labels" : "No Labels";
-          renderLayers();
+
+      list.querySelectorAll("[data-labels]").forEach(el=>{
+        el.onclick=()=>{
+          const key=el.dataset.labels;
+          state.labels.set(key,!state.labels.get(key));
+          el.textContent=state.labels.get(key) ? "Labels" : "No Labels";
+          renderLabels();
         };
       });
-      list.querySelectorAll("[data-zoom]").forEach(el => {
-        el.onclick = () => zoomProject(el.dataset.zoom);
+
+      list.querySelectorAll("[data-zoom]").forEach(el=>{
+        el.onclick=async()=>{
+          const key=el.dataset.zoom;
+          const project=state.projects.find(p=>p.key===key);
+          if (!state.loaded.has(key)) await loadProject(project);
+          zoomProject(project);
+        };
       });
     }
 
     function renderLegend(){
-      const legend = $("legend");
-      const items = [...state.projects.values()].sort((a,b)=>a.name.localeCompare(b.name)).slice(0,12);
-      legend.innerHTML = items.map(p => `
-        <span class="legend-item"><span class="swatch" style="background:${p.color}"></span>${escapeHtml(p.name)}</span>
+      const legend=$("legend");
+      const items=state.projects.filter(p=>state.visible.get(p.key));
+      legend.innerHTML=items.map(p=>`
+        <span class="legend-item"><span class="swatch" style="background:${p.color}"></span>${escapeHtml(p.name)} ${Number(p.featureCount || 0).toLocaleString()}</span>
       `).join("");
     }
 
     function zoomProject(project){
-      const feats = [...state.polygons, ...state.points, ...state.lines].filter(f => projectName(f) === project);
-      if (!feats.length) return;
-      const layer = L.geoJSON({ type:"FeatureCollection", features:feats });
-      const b = layer.getBounds();
-      if (b.isValid()) map.fitBounds(b.pad(.15));
+      const loaded=state.loaded.get(project.key);
+      if (!loaded) return;
+
+      const features=[];
+      for (const file of loaded.files) features.push(...file.features);
+      if (!features.length) return;
+
+      const layer=L.geoJSON({type:"FeatureCollection",features});
+      const b=layer.getBounds();
+      if (b.isValid()) map.fitBounds(b.pad(.12));
     }
 
-    function fitAll(){
-      const feats = [...state.polygons, ...state.points, ...state.lines].filter(shouldShowFeature);
-      if (!feats.length) return;
-      const layer = L.geoJSON({ type:"FeatureCollection", features:feats });
-      const b = layer.getBounds();
+    async function fitAll(){
+      const features=[];
+      for (const project of state.projects){
+        if (!state.visible.get(project.key)) continue;
+        const loaded=state.loaded.get(project.key);
+        if (!loaded) continue;
+        for (const file of loaded.files) features.push(...file.features);
+      }
+      if (!features.length) return;
+      const layer=L.geoJSON({type:"FeatureCollection",features});
+      const b=layer.getBounds();
       if (b.isValid()) map.fitBounds(b.pad(.08));
     }
 
     function setupControls(){
-      $("panelBtn").onclick = () => {
+      $("panelBtn").onclick=()=>{
         $("panel").classList.toggle("collapsed");
-        $("panelBtn").textContent = $("panel").classList.contains("collapsed") ? "Open Layers" : "Close Layers";
+        $("panelBtn").textContent=$("panel").classList.contains("collapsed") ? "Open Layers" : "Close Layers";
       };
-      $("fitBtn").onclick = fitAll;
 
-      $("satBtn").onclick = () => {
+      $("fitBtn").onclick=fitAll;
+
+      $("satBtn").onclick=()=>{
         if (map.hasLayer(street)) map.removeLayer(street);
         if (!map.hasLayer(satellite)) satellite.addTo(map);
         $("satBtn").classList.add("active");
         $("streetBtn").classList.remove("active");
       };
-      $("streetBtn").onclick = () => {
+
+      $("streetBtn").onclick=()=>{
         if (map.hasLayer(satellite)) map.removeLayer(satellite);
         if (!map.hasLayer(street)) street.addTo(map);
         $("streetBtn").classList.add("active");
         $("satBtn").classList.remove("active");
       };
 
-      $("labelsBtn").onclick = () => {
-        state.showLabels = !state.showLabels;
-        $("labelsBtn").classList.toggle("active", state.showLabels);
-        $("labelsBtn").textContent = state.showLabels ? "Labels On" : "Labels Off";
-        renderLayers();
-      };
-      $("pointsBtn").onclick = () => {
-        state.showPoints = !state.showPoints;
-        $("pointsBtn").classList.toggle("active", state.showPoints);
-        $("pointsBtn").textContent = state.showPoints ? "Points On" : "Points Off";
-        renderLayers();
-      };
-      $("polysBtn").onclick = () => {
-        state.showPolygons = !state.showPolygons;
-        $("polysBtn").classList.toggle("active", state.showPolygons);
-        $("polysBtn").textContent = state.showPolygons ? "Polygons On" : "Polygons Off";
-        renderLayers();
-      };
-      $("linesBtn").onclick = () => {
-        state.showLines = !state.showLines;
-        $("linesBtn").classList.toggle("active", state.showLines);
-        $("linesBtn").textContent = state.showLines ? "Lines On" : "Lines Off";
-        renderLayers();
+      $("labelsBtn").onclick=()=>{
+        state.showLabels=!state.showLabels;
+        $("labelsBtn").classList.toggle("active",state.showLabels);
+        renderLabels();
       };
 
-      $("search").oninput = e => {
-        state.query = e.target.value.trim();
-        renderLayers();
+      $("pointsBtn").onclick=async()=>{
+        state.showPoints=!state.showPoints;
+        $("pointsBtn").classList.toggle("active",state.showPoints);
+        await renderAll();
       };
 
-      map.on("zoomend moveend", () => {
-        renderLayers();
-      });
+      $("polysBtn").onclick=async()=>{
+        state.showPolygons=!state.showPolygons;
+        $("polysBtn").classList.toggle("active",state.showPolygons);
+        await renderAll();
+      };
+
+      $("linesBtn").onclick=async()=>{
+        state.showLines=!state.showLines;
+        $("linesBtn").classList.toggle("active",state.showLines);
+        await renderAll();
+      };
+
+      $("search").oninput=async e=>{
+        state.query=e.target.value.trim();
+        await renderAll();
+      };
+
+      map.on("zoomend", renderLabels);
     }
 
     async function init(){
-      try {
+      try{
         setupControls();
 
-        const [polys, points, lines, manifest, config] = await Promise.all([
-          loadJson("data/map/combined_polygons.geojson", { type:"FeatureCollection", features:[] }),
-          loadJson("data/map/combined_points.geojson", { type:"FeatureCollection", features:[] }),
-          loadJson("data/map/combined_lines.geojson", { type:"FeatureCollection", features:[] }),
-          loadJson("data/map/project_manifest.json", null).catch(()=>null),
-          loadJson("data/map/map_config.json", null).catch(()=>null)
-        ]);
+        state.manifest=await loadJson("data/map/manifest.json");
+        state.projects=state.manifest.projects || [];
 
-        state.polygons = polys.features || [];
-        state.points = points.features || [];
-        state.lines = lines.features || [];
-        state.manifest = manifest;
-        state.config = config;
+        for (const p of state.projects){
+          state.visible.set(p.key, !!p.defaultVisible);
+          state.labels.set(p.key, !!p.defaultLabels);
+        }
 
-        buildProjects();
-        renderProjectList();
+        buildPanel();
         renderLegend();
-        renderLayers();
-        fitAll();
 
+        // Load default visible projects only.
+        for (const project of state.projects){
+          if (state.visible.get(project.key)){
+            await renderProject(project);
+          }
+        }
+
+        await fitAll();
+        updateSubtitle();
         status("Map loaded");
-      } catch (err) {
+      }catch(err){
         console.error(err);
-        $("subtitle").textContent = "Map failed to load";
-        status("Map failed to load: " + err.message, 6000);
+        $("subtitle").textContent="Map failed to load";
+        status("Map failed: " + err.message, 7000);
       }
     }
 
