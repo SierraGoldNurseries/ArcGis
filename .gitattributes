@@ -3,7 +3,6 @@
 data/raw/*.ppkx filter=lfs diff=lfs merge=lfs -text
 data/raw/*.mpkx filter=lfs diff=lfs merge=lfs -text
 data/raw/*.zip filter=lfs diff=lfs merge=lfs -text
-
 # IMPORTANT: web map data must be real text files, not Git LFS pointers.
 data/map/**/*.geojson -filter -diff -merge text
 data/map/*.geojson -filter -diff -merge text
