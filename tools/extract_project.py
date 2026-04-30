@@ -21,17 +21,18 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = ROOT / "data" / "raw"
 MAP_DIR = ROOT / "data" / "map"
 
+# Labels are now ON by default for all harvested projects.
 PROJECT_RULES = [
     ("chemical", "Chemical Locations", "#dc2626", True, True),
-    ("irrigation", "Irrigation", "#2563eb", True, False),
-    ("owl", "Owl Boxes", "#7c3aed", True, False),
-    ("tree", "Trees", "#16a34a", True, False),
-    ("prune_north", "Prune North", "#9333ea", True, False),
-    ("prunenorth", "Prune North", "#9333ea", True, False),
-    ("prune_south", "Prune South", "#c026d3", True, False),
-    ("prunesouth", "Prune South", "#c026d3", True, False),
-    ("railroad_south", "Railroad South", "#0f766e", True, False),
-    ("railroadsouth", "Railroad South", "#0f766e", True, False),
+    ("irrigation", "Irrigation", "#2563eb", True, True),
+    ("owl", "Owl Boxes", "#7c3aed", True, True),
+    ("tree", "Trees", "#16a34a", True, True),
+    ("prune_north", "Prune North", "#9333ea", True, True),
+    ("prunenorth", "Prune North", "#9333ea", True, True),
+    ("prune_south", "Prune South", "#c026d3", True, True),
+    ("prunesouth", "Prune South", "#c026d3", True, True),
+    ("railroad_south", "Railroad South", "#0f766e", True, True),
+    ("railroadsouth", "Railroad South", "#0f766e", True, True),
     ("block_#23", "Block #23", "#f59e0b", True, True),
     ("block_23", "Block #23", "#f59e0b", True, True),
     ("block23", "Block #23", "#f59e0b", True, True),
@@ -46,15 +47,17 @@ COLOR_PALETTE = [
     "#0f766e", "#0284c7", "#7c3aed", "#b45309", "#dc2626",
     "#0891b2", "#4f46e5", "#be185d", "#15803d", "#9333ea",
     "#64748b", "#f59e0b", "#ea580c", "#14b8a6", "#2563eb",
-    "#16a34a", "#ca8a04", "#0ea5e9", "#7e22ce", "#c2410c"
+    "#16a34a", "#ca8a04", "#0ea5e9", "#7e22ce", "#c2410c",
+    "#65a30d", "#0369a1", "#a16207", "#be123c", "#047857"
 ]
 
 GENERIC_LABELS = {
     "polygon", "polygons", "point", "points", "line", "lines",
     "layer", "layers", "shape", "shapes", "feature", "features",
-    "area", "areas", "block", "blocks"
+    "area", "areas", "block", "blocks", "multipolygon", "multipolygons"
 }
 
+# Prefer these fields if present in the feature attributes.
 PREFERRED_LABEL_FIELDS = [
     "Name", "NAME", "name",
     "Label", "LABEL", "label",
@@ -62,9 +65,12 @@ PREFERRED_LABEL_FIELDS = [
     "Block", "BLOCK", "block",
     "BlockName", "BLOCKNAME", "blockname",
     "Block_Name", "block_name",
+    "Orchard", "ORCHARD", "orchard",
+    "Variety", "VARIETY", "variety",
     "Site", "SITE", "site",
     "AreaName", "AREANAME", "area_name",
-    "Description", "DESCRIPTION", "description"
+    "Description", "DESCRIPTION", "description",
+    "Layer", "LAYER", "layer"
 ]
 
 
@@ -103,7 +109,7 @@ def project_meta(path: Path) -> Dict[str, Any]:
         "project_key": "other",
         "project_color": "#64748b",
         "default_visible": True,
-        "default_labels": False,
+        "default_labels": True,
     }
 
 
@@ -128,33 +134,32 @@ def is_meaningful_label(value: Any) -> bool:
     return True
 
 
-def best_label(props: Dict[str, Any], layer_name: str) -> str:
+def best_label(props: Dict[str, Any], layer_name: str, project_name: str, fid: int) -> str:
     for field in PREFERRED_LABEL_FIELDS:
         if field in props and is_meaningful_label(props[field]):
             return str(props[field]).strip()
 
-    # fallback: any field containing name/label/block/title/site
-    ranked_keys: List[str] = []
-    for key in props.keys():
-        low = key.lower()
-        if any(token in low for token in ["name", "label", "block", "title", "site", "area"]):
-            ranked_keys.append(key)
+    # Fallback: any useful name-ish field.
+    for key, val in props.items():
+        low = str(key).lower()
+        if any(token in low for token in ["name", "label", "block", "title", "site", "area", "orchard", "variety"]):
+            if is_meaningful_label(val):
+                return str(val).strip()
 
-    for key in ranked_keys:
-        if is_meaningful_label(props.get(key)):
-            return str(props[key]).strip()
+    # If layer name is generic, do NOT label as "Polygons".
+    if clean(layer_name).lower() in GENERIC_LABELS:
+        # For block polygons, use project and fid so it isn't blank/generic.
+        if project_name.lower().startswith("block"):
+            return f"{project_name} #{fid + 1}"
+        return ""
 
-    # final fallback: if layer name is generic, return blank so label is removed
-    if is_meaningful_label(layer_name):
-        return human(layer_name)
-    return ""
+    return human(layer_name)
 
 
 def group_key(label: str, layer_name: str, project_name: str) -> str:
     base = label or layer_name or project_name
     normalized = clean(base)
 
-    # Normalize common SGN structural groups to same color groups
     patterns = [
         r"^(High_Tunnels_\d+)(?:_[A-Za-z])?$",
         r"^(Can_Yard_\d+)(?:_[A-Za-z])?$",
@@ -168,29 +173,30 @@ def group_key(label: str, layer_name: str, project_name: str) -> str:
         if m:
             return clean(m.group(1)).lower()
 
-    # for named blocks like "Orange Tree", "Hock East B", etc.
+    # Named blocks like Orange Tree, Hock East B, River North, etc. get separate colors.
     return clean(base).lower()
 
 
 def extract_archive(src: Path, dst: Path) -> bool:
     log(f"Extracting {src.name}...")
     try:
-      subprocess.run(
-          ["7z", "x", "-y", f"-o{dst}", str(src)],
-          check=True,
-          stdout=subprocess.DEVNULL,
-          stderr=subprocess.STDOUT,
-      )
-      return True
+        subprocess.run(
+            ["7z", "x", "-y", f"-o{dst}", str(src)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+        )
+        return True
     except Exception as exc:
-      log(f"7z failed for {src.name}: {exc}. Trying zipfile...")
+        log(f"7z failed for {src.name}: {exc}. Trying zipfile...")
+
     try:
-      with zipfile.ZipFile(src) as z:
-          z.extractall(dst)
-      return True
+        with zipfile.ZipFile(src) as z:
+            z.extractall(dst)
+        return True
     except Exception as exc:
-      log(f"WARNING: could not extract {src.name}: {exc}")
-      return False
+        log(f"WARNING: could not extract {src.name}: {exc}")
+        return False
 
 
 def find_gdbs(folder: Path) -> List[Path]:
@@ -216,6 +222,13 @@ def geom_kind(flat_type: int) -> str:
     if flat_type in (ogr.wkbLineString, ogr.wkbMultiLineString):
         return "line"
     return "other"
+
+
+def kind_from_geometry(geom: ogr.Geometry) -> str:
+    if geom is None or geom.IsEmpty():
+        return "other"
+    flat = ogr.GT_Flatten(geom.GetGeometryType())
+    return geom_kind(flat)
 
 
 def feature_to_geojson(feat: ogr.Feature, layer: ogr.Layer, transform: Optional[osr.CoordinateTransformation]) -> Optional[Dict[str, Any]]:
@@ -278,19 +291,19 @@ def add_meta(
     kind: str,
 ) -> Dict[str, Any]:
     props = feature.setdefault("properties", {})
-    label = best_label(props, layer_name)
+    label = best_label(props, layer_name, meta["project"], fid)
     gkey = group_key(label, layer_name, meta["project"])
     gcolor = color_for(gkey)
 
     props["_project"] = meta["project"]
     props["_project_key"] = meta["project_key"]
     props["_project_color"] = meta["project_color"]
-    props["_default_visible"] = meta["default_visible"]
-    props["_default_labels"] = meta["default_labels"]
+    props["_default_visible"] = True
+    props["_default_labels"] = True
     props["_package"] = package_name
     props["_gdb"] = gdb_name
     props["_layer"] = layer_name
-    props["_layer_display"] = human(layer_name)
+    props["_layer_display"] = "" if clean(layer_name).lower() in GENERIC_LABELS else human(layer_name)
     props["_label"] = label
     props["_group_key"] = gkey
     props["_group_color"] = gcolor
@@ -335,12 +348,9 @@ def read_gdb(
         if not layer_name or low.startswith("gdb_") or low in {"gdb_items", "gdb_itemtypes"}:
             continue
 
-        flat = ogr.GT_Flatten(layer.GetGeomType())
-        kind = geom_kind(flat)
-        if kind == "other":
-            continue
-
+        layer_kind = geom_kind(ogr.GT_Flatten(layer.GetGeomType()))
         transform = spatial_transform(layer)
+
         try:
             count_reported = layer.GetFeatureCount()
         except Exception:
@@ -353,6 +363,15 @@ def read_gdb(
             for feat in layer:
                 gj = feature_to_geojson(feat, layer, transform)
                 if gj is None:
+                    continue
+
+                if layer_kind == "other":
+                    geom = feat.GetGeometryRef()
+                    kind = kind_from_geometry(geom)
+                else:
+                    kind = layer_kind
+
+                if kind == "other":
                     continue
 
                 fid = int(feat.GetFID()) if feat.GetFID() is not None else exported
@@ -382,14 +401,14 @@ def read_gdb(
             "project": meta["project"],
             "gdb": gdb.name,
             "layer": layer_name,
-            "geometry_kind": kind,
+            "geometry_kind": layer_kind,
             "feature_count_reported": count_reported,
             "feature_count_exported": exported,
-            "default_visible": meta["default_visible"],
-            "default_labels": meta["default_labels"],
+            "default_visible": True,
+            "default_labels": True,
         })
 
-        log(f"  {meta['project']} / {layer_name}: {exported} {kind} feature(s)")
+        log(f"  {meta['project']} / {layer_name}: {exported} feature(s)")
 
 
 def write_geojson(path: Path, features: List[Dict[str, Any]]) -> None:
@@ -407,6 +426,7 @@ def write_inventory(path: Path, rows: List[Dict[str, Any]]) -> None:
         "feature_count_reported", "feature_count_exported",
         "default_visible", "default_labels"
     ]
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
@@ -425,8 +445,8 @@ def build_manifest(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "key": key,
                 "name": name,
                 "color": color,
-                "default_visible": bool(row.get("default_visible", True)),
-                "default_labels": bool(row.get("default_labels", False)),
+                "default_visible": True,
+                "default_labels": True,
                 "feature_count": 0,
                 "layers": [],
             }
@@ -456,12 +476,12 @@ def build_config(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         "project_defaults": {
             "Structures / Yards": {"labels": True, "visible": True},
             "Chemical Locations": {"labels": True, "visible": True},
-            "Irrigation": {"labels": False, "visible": True, "show_labels_when_selected": True},
-            "Owl Boxes": {"labels": False, "visible": True},
-            "Trees": {"labels": False, "visible": True, "cluster": True, "search": True},
-            "Prune North": {"labels": False, "visible": True, "filtered_view": True},
-            "Prune South": {"labels": False, "visible": True, "filtered_view": True},
-            "Railroad South": {"labels": False, "visible": True, "filtered_view": True},
+            "Irrigation": {"labels": True, "visible": True},
+            "Owl Boxes": {"labels": True, "visible": True},
+            "Trees": {"labels": True, "visible": True, "cluster": True, "search": True},
+            "Prune North": {"labels": True, "visible": True},
+            "Prune South": {"labels": True, "visible": True},
+            "Railroad South": {"labels": True, "visible": True},
             "Block #23": {"labels": True, "visible": True, "opacity": 0.16},
             "Block #25": {"labels": True, "visible": True, "opacity": 0.16},
         },
