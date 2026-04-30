@@ -14,8 +14,6 @@ permissions:
   contents: write
   actions: read
 
-timeout-minutes: 45
-
 concurrency:
   group: arcgis-map-build
   cancel-in-progress: true
@@ -23,6 +21,8 @@ concurrency:
 jobs:
   build-map-data:
     runs-on: ubuntu-latest
+    timeout-minutes: 45   # ✅ FIXED: moved inside job
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,25 +32,21 @@ jobs:
       - name: Install GIS libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y gdal-bin p7zip-full
-          ogrinfo --version
+          sudo apt-get install -y python3 python3-pip python3-venv
 
-      - name: Build combined polygons and points from every project in data/raw
+      - name: Install Python deps
         run: |
-          if [ -z "$(find data/raw -mindepth 1 -maxdepth 1 ! -name '.gitkeep' 2>/dev/null)" ]; then
-            echo "No files in data/raw. Nothing to extract."
-            exit 0
-          fi
-          python3 tools/extract_project.py
+          pip install --upgrade pip
+          pip install geopandas shapely fiona pyproj
 
-      - name: Commit rebuilt map data
+      - name: Run extractor
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/combined_polygons.geojson data/combined_points.geojson data/structures_polygons.geojson data/structures_points.geojson data/map_config.json data/project_manifest.json data/layer_inventory.csv data/layers/ || true
-          if git diff --cached --quiet; then
-            echo "No generated map-data changes to commit."
-          else
-            git commit -m "Auto-build combined ArcGIS map data"
-            git push
-          fi
+          python tools/extract_project.py
+
+      - name: Commit & push if changed
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/optimized || true
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-build optimized GeoJSON"
+          git push
