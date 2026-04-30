@@ -3,123 +3,58 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Basic Facility Map</title>
+  <title>SGN Map App - Basic Blocks</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    html, body, #map { height: 100%; margin: 0; }
-    body { font-family: Arial, Helvetica, sans-serif; }
-    .leaflet-container { background: #111; }
-    .block-label {
-      color: #071a35;
-      font-weight: 800;
-      font-size: 13px;
-      line-height: 1;
-      white-space: nowrap;
-      text-align: center;
-      text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 4px #fff;
-      pointer-events: none;
-    }
-    .panel {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 999;
-      background: rgba(255,255,255,.92);
-      border-radius: 10px;
-      padding: 8px 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.25);
-      font-size: 13px;
-    }
-    .panel b { display:block; margin-bottom:3px; }
+    :root{--bg:#eef2f7;--panel:#fff;--text:#0f172a;--muted:#64748b;--border:#d8e0ec;--brand:#0f766e;--shadow:0 12px 32px rgba(15,23,42,.14)}
+    *{box-sizing:border-box} html,body,#map{height:100%;margin:0} body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text);overflow:hidden;background:#0f172a} #map{width:100%;height:100%}
+    .topbar{position:absolute;left:12px;right:12px;top:12px;z-index:1000;display:flex;align-items:center;gap:10px;pointer-events:none}.brand{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.95);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:20px;padding:8px 12px;pointer-events:auto;max-width:min(760px,calc(100vw - 24px))}.logo{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#0f766e);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:13px}.brand-title{font-weight:900;font-size:16px;line-height:1.05}.brand-sub{color:var(--muted);font-size:12px;font-weight:700;margin-top:2px}.top-actions{margin-left:auto;display:flex;gap:8px;pointer-events:auto;flex-wrap:wrap}
+    button,.button-link{border:1px solid var(--border);background:#fff;color:#0f172a;border-radius:14px;padding:10px 12px;font-weight:900;cursor:pointer;box-shadow:0 6px 16px rgba(15,23,42,.09);text-decoration:none;font-size:13px;white-space:nowrap}button.primary,.button-link.primary{background:#0f766e;color:#fff;border-color:#0f766e}button.active{background:#ecfeff;border-color:#67e8f9;color:#155e75}button.disabled{opacity:.55;cursor:not-allowed}
+    .panel{position:absolute;left:12px;top:76px;bottom:14px;width:410px;z-index:1000;background:rgba(255,255,255,.96);backdrop-filter:blur(16px);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:22px;overflow:hidden;display:flex;flex-direction:column;transition:transform .22s ease,opacity .22s ease}.panel.collapsed{transform:translateX(calc(-100% - 20px));opacity:.15;pointer-events:none}.panel-head{padding:14px;border-bottom:1px solid var(--border)}.search{width:100%;height:42px;border:1px solid var(--border);border-radius:14px;padding:0 12px;font-weight:800;outline:none}.quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.quick button{box-shadow:none;padding:10px 8px;font-size:12px}.panel-body{overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}.hint{font-size:12px;color:#475569;font-weight:700;line-height:1.35;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px}.hint b{color:#0f172a}.block-list{display:flex;flex-direction:column;gap:8px}.block-row{display:flex;gap:8px;align-items:center;padding:10px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}.block-row span{font-weight:900;flex:1}.block-row small{color:#64748b;font-weight:800}.check{display:flex;align-items:center;gap:8px}.check input{width:16px;height:16px}.count{font-size:11px;color:#64748b;font-weight:900}.label{color:#0f172a;font-weight:950;font-size:12px;white-space:nowrap;background:rgba(255,255,255,.88);border:1px solid rgba(15,23,42,.15);border-radius:5px;padding:2px 5px;box-shadow:0 1px 4px rgba(15,23,42,.15);transform:translate(-50%,-50%);pointer-events:none;line-height:1.05;text-align:center}.popup h3{margin:0 0 8px;font-size:15px}.popup-grid{display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:12px}.popup-grid b{color:#475569}.status{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;z-index:1000;background:rgba(15,23,42,.92);color:#fff;border-radius:999px;padding:9px 12px;font-weight:800;font-size:12px;box-shadow:var(--shadow);display:none}.status.show{display:block}.selected-outline{filter:drop-shadow(0 0 4px rgba(15,118,110,.8))}
+    @media(max-width:800px){.brand-sub{display:none}.panel{width:min(410px,calc(100vw - 20px));top:70px}.top-actions{gap:5px}button,.button-link{padding:9px 10px;font-size:12px}}
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div class="panel"><b>Basic Facility Map</b>Blocks only. No tree plots.</div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    // Basic static map: no external GeoJSON files are loaded, so GitHub Pages works without /data/optimized files.
-    // Main facility start view: 4793 Garden Hwy, Yuba City, CA 95991 area.
-    const FACILITY_BOUNDS = {
-      north: 39.10510,
-      south: 39.10005,
-      west: -121.63970,
-      east: -121.63145
-    };
-
-    function ll(x, y) {
-      const lat = FACILITY_BOUNDS.north - y * (FACILITY_BOUNDS.north - FACILITY_BOUNDS.south);
-      const lng = FACILITY_BOUNDS.west + x * (FACILITY_BOUNDS.east - FACILITY_BOUNDS.west);
-      return [lat, lng];
-    }
-
-    function rect(label, x1, y1, x2, y2, color) {
-      const bounds = [ll(x1, y2), ll(x2, y1)];
-      const poly = L.rectangle(bounds, {
-        color: '#18345b',
-        weight: 2,
-        fillColor: color,
-        fillOpacity: 0.42
-      }).addTo(blockLayer);
-      poly.bindTooltip(label, {
-        permanent: true,
-        direction: 'center',
-        className: 'block-label',
-        opacity: 1
-      });
-      poly.bindPopup('<b>' + label + '</b>');
-      return poly;
-    }
-
-    const map = L.map('map', { zoomControl: true, preferCanvas: true });
-
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 22,
-      attribution: 'Tiles &copy; Esri'
-    }).addTo(map);
-
-    const blockLayer = L.layerGroup().addTo(map);
-
-    const blocks = [
-      ['CY01-A', .06,.07,.26,.14,'#39a7d8'], ['CY01-B', .26,.07,.43,.14,'#33c1a3'],
-      ['CY01-C', .06,.14,.26,.22,'#b7c86b'], ['CY01-D', .26,.14,.43,.22,'#8d704d'],
-      ['CY02-A', .07,.23,.28,.29,'#62a9d4'], ['CY02-B', .28,.23,.43,.29,'#65c586'],
-      ['CY02-C', .07,.29,.26,.36,'#95a947'], ['CY02-D', .26,.29,.43,.36,'#bd8a72'],
-
-      ['HH03', .06,.38,.17,.50,'#d9f38d'], ['ZN10', .17,.38,.24,.50,'#c7ef81'],
-      ['ZN09', .24,.38,.31,.50,'#bde56f'], ['ZN08', .31,.38,.38,.50,'#d7f28a'],
-      ['ZN07', .38,.38,.45,.50,'#e7f6a2'], ['ZN06', .45,.37,.49,.44,'#cceda0'],
-      ['ZN05', .45,.44,.49,.50,'#a6dc6e'],
-
-      ['SH03-W', .06,.53,.27,.76,'#178f79'], ['SH03-E', .27,.53,.43,.76,'#2f9f81'],
-      ['SH04-W', .06,.79,.27,.97,'#249b87'], ['SH04-E', .27,.79,.43,.97,'#4aa88e'],
-
-      ['HT05-A', .47,.07,.64,.14,'#a9d4ef'], ['HT05-B', .64,.07,.81,.14,'#94e7c2'],
-      ['SH05', .81,.07,.84,.22,'#42a983'],
-      ['HT05-C', .47,.14,.64,.22,'#f0dd96'], ['HT05-D', .64,.14,.81,.22,'#efb9ad'],
-      ['HT06-A', .47,.24,.64,.32,'#b7daf0'], ['HT06-B', .64,.24,.81,.32,'#99e3bc'],
-      ['HT06-C', .47,.32,.64,.41,'#efd891'], ['HT06-D', .64,.32,.78,.41,'#edafa8'],
-
-      ['FB01', .47,.44,.52,.49,'#62b7c8'], ['FB02', .52,.44,.57,.49,'#79bfd0'],
-      ['FB03', .57,.44,.62,.49,'#67b0c6'], ['FB04', .62,.44,.68,.49,'#83c6d6'],
-      ['FB05', .68,.44,.74,.49,'#78bace'], ['FB06', .74,.44,.78,.49,'#87cddd'],
-
-      ['CF09', .47,.52,.49,.55,'#f0b35f'], ['CF07', .49,.52,.52,.55,'#efc468'],
-      ['MT01', .52,.51,.62,.54,'#e3c277'], ['MT02', .52,.54,.62,.57,'#d7b05e'],
-      ['ZN03', .62,.51,.71,.54,'#d7ed92'], ['ZN02', .62,.54,.71,.57,'#c7e989'], ['ZN04', .71,.51,.77,.57,'#e4f1a2'],
-      ['HH01', .55,.57,.62,.64,'#d6ed9f'], ['Soil', .52,.57,.55,.64,'#cfe5dc'], ['Bunker', .62,.57,.71,.64,'#c5e681'],
-
-      ['Pond', .44,.78,.54,.97,'#189a8f'], ['CY08', .55,.78,.63,.97,'#74c7c4'],
-      ['Solar01', .65,.79,.70,.90,'#c49a32'], ['Shop', .63,.72,.67,.76,'#d8d8d8']
-    ];
-
-    blocks.forEach(b => rect(...b));
-
-    const fullBounds = [ll(0.04, 0.99), ll(0.86, 0.05)];
-    map.fitBounds(fullBounds, { padding: [24, 24] });
-
-    L.control.layers(null, { 'Blocks': blockLayer }, { collapsed: false }).addTo(map);
-  </script>
+  <div class="topbar"><div class="brand"><div class="logo">SGN</div><div><div class="brand-title">SGN Map App</div><div id="subtitle" class="brand-sub">Basic block map loading...</div></div></div><div class="top-actions"><button id="panelBtn">Close Layers</button><button id="clearBtn">Clear Map Cache</button><a class="button-link primary" href="./import.html">Admin / Import</a></div></div>
+  <aside id="panel" class="panel">
+    <div class="panel-head"><input id="search" class="search" placeholder="Search block / layer name..." /><div class="quick"><button id="satBtn" class="active">Satellite</button><button id="streetBtn">Street</button><button id="fitBtn">Fit Main Site</button><button id="labelsBtn" class="active">Labels</button></div></div>
+    <div class="panel-body"><div class="hint"><b>Basic mode:</b> loads polygons and line layers from <b>data/map/manifest.json</b>. It does <b>not</b> load point files or tree plot points.</div><div class="hint"><b>Left menu kept:</b> use checkboxes to show/hide each block/layer. Search filters this list and labels.</div><div id="blockList" class="block-list"></div></div>
+  </aside>
+  <div id="status" class="status"></div>
+<script>
+const DATA_VERSION="basic-blocks-no-points-v9-2026-04-30";
+const DEFAULT_VIEW=[39.1404,-121.6176];
+const $=id=>document.getElementById(id);
+const PALETTE=["#2563eb","#16a34a","#dc2626","#9333ea","#ea580c","#0891b2","#65a30d","#be123c","#7c3aed","#0d9488","#ca8a04","#4f46e5","#db2777","#0284c7","#84cc16","#f97316","#14b8a6","#8b5cf6","#22c55e","#e11d48","#0ea5e9","#a16207","#f43f5e","#10b981"];
+const MAIN_SITE_MATCH=/can\s*yard|high\s*tunnel|shade\s*house|shadehouse|head\s*house|four\s*bay|cold\s*frame|maintenance\s*trailer|soil|bunker|solar|pond|shop|zone/i;
+const state={items:[],labels:[],showLabels:true,query:"",selected:null};
+const map=L.map("map",{zoomControl:true,preferCanvas:true,renderer:L.canvas({padding:.35})}).setView(DEFAULT_VIEW,16);
+const satellite=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:19,maxZoom:22,attribution:"Tiles © Esri"}).addTo(map);
+const street=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:22,attribution:"© OpenStreetMap"});
+function status(msg,timeout=2600){const el=$("status");el.textContent=msg;el.classList.add("show");clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("show"),timeout)}
+function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[s]))}
+function hashText(text){let h=2166136261;for(const ch of String(text||"")){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return Math.abs(h>>>0)}
+function colorFor(key){return PALETTE[hashText(key)%PALETTE.length]}
+function bestName(props={},fallback="Block"){for(const k of ["Name","NAME","name","Label","LABEL","label","Block","BLOCK","block","BlockName","Block_Name","_project","_layer_display"]){const v=props[k];if(v&&String(v).trim()&&!/^(polygon|line|point|feature)$/i.test(String(v).trim()))return String(v).trim()}return fallback}
+function shortLabel(label){let s=String(label||"").trim().replace(/#/g,"").replace(/_/g," ").replace(/\s+/g," ");let m;if((m=s.match(/^Can\s*Yard\s*0*(\d+)\s*([A-Z])?\s*([A-Z0-9]+)?$/i)))return`CY${String(m[1]).padStart(2,"0")}${m[2]?"-"+m[2].toUpperCase():""}${m[3]?m[3].toUpperCase():""}`;if((m=s.match(/^High\s*Tunnels?\s*0*(\d+)\s*([A-Z])?$/i)))return`HT${String(m[1]).padStart(2,"0")}${m[2]?"-"+m[2].toUpperCase():""}`;if((m=s.match(/^Shade\s*house\s*0*(\d+)\s*([A-Z])?$/i))||(m=s.match(/^Shadehouse\s*0*(\d+)\s*([A-Z])?$/i)))return`SH${String(m[1]).padStart(2,"0")}${m[2]?"-"+m[2].toUpperCase():""}`;if((m=s.match(/^Four\s*Bay\s*0*(\d+)$/i)))return`FB${String(m[1]).padStart(2,"0")}`;if((m=s.match(/^Head\s*House\s*0*(\d+)$/i)))return`HH${String(m[1]).padStart(2,"0")}`;if((m=s.match(/^Cold\s*Frame\s*0*(\d+)$/i)))return`CF${String(m[1]).padStart(2,"0")}`;if((m=s.match(/^Maintenance\s*Trailer\s*0*(\d+)$/i)))return`MT${String(m[1]).padStart(2,"0")}`;if((m=s.match(/^Solar\s*Panels?\s*0*(\d+)$/i)))return`SP${String(m[1]).padStart(2,"0")}`;if((m=s.match(/^Zone\s*0*(\d+)$/i)))return`ZN${String(m[1]).padStart(2,"0")}`;return s.length>18?s.replace(/\bHouse\b/ig,"Hse").replace(/\bTrailer\b/ig,"Trlr").replace(/\bStorage\b/ig,"Stg").replace(/\bMaintenance\b/ig,"Maint"):s}
+function centerOfFeature(f){try{const g=f.geometry;if(!g)return null;let coords=[];const collect=a=>Array.isArray(a[0])?a.forEach(collect):coords.push(a);collect(g.coordinates);let sx=0,sy=0,n=0;coords.forEach(c=>{if(Number.isFinite(c[0])&&Number.isFinite(c[1])){sx+=c[0];sy+=c[1];n++}});return n?[sy/n,sx/n]:null}catch{return null}}
+function popupHtml(f,item){const p=f.properties||{};const name=bestName(p,item.name);return`<div class="popup"><h3>${escapeHtml(name)}</h3><div class="popup-grid"><b>Short</b><span>${escapeHtml(shortLabel(name))}</span><b>Layer</b><span>${escapeHtml(item.name)}</span><b>Path</b><span>${escapeHtml(item.path)}</span></div></div>`}
+async function fetchJson(path){const res=await fetch(path,{cache:"no-store"});if(!res.ok)throw new Error(`${path} ${res.status}`);const text=await res.text();if(text.startsWith("version https://git-lfs.github.com"))throw new Error(`${path} is a Git LFS pointer, not real GeoJSON`);return JSON.parse(text)}
+function styleFor(item){return f=>{const c=item.color||colorFor(item.key);return item.type==="line"?{color:c,weight:3,opacity:.9,lineCap:"round",lineJoin:"round"}:{color:"#0f172a",weight:2,opacity:.96,fillColor:c,fillOpacity:.24}}}
+function addLabels(){clearLabels();if(!state.showLabels||map.getZoom()<14)return;const seen=new Set();for(const item of state.items){if(!item.visible||item.type==="point")continue;if(state.query&&!item.name.toLowerCase().includes(state.query.toLowerCase()))continue;for(const f of (item.data.features||[])){const name=bestName(f.properties||{},item.name);if(!name)continue;const c=centerOfFeature(f);if(!c)continue;const key=(name+item.key).toLowerCase();if(seen.has(key))continue;seen.add(key);state.labels.push(L.marker(c,{icon:L.divIcon({className:"",html:`<div class="label">${escapeHtml(shortLabel(name))}</div>`}),interactive:false,keyboard:false}).addTo(map))}}}
+function clearLabels(){state.labels.forEach(m=>map.removeLayer(m));state.labels=[]}
+function renderItem(item){if(item.layer)map.removeLayer(item.layer);if(!item.visible)return;item.layer=L.geoJSON(item.data,{style:styleFor(item),onEachFeature:(f,l)=>l.bindPopup(popupHtml(f,item))}).addTo(map)}
+function rerender(){for(const item of state.items)renderItem(item);addLabels();buildList()}
+function buildList(){const q=state.query.toLowerCase();const rows=state.items.filter(i=>!q||i.name.toLowerCase().includes(q)||i.key.toLowerCase().includes(q)).map(i=>`<div class="block-row"><label class="check"><input type="checkbox" data-key="${escapeHtml(i.key)}" ${i.visible?"checked":""}><span>${escapeHtml(shortLabel(i.name))}</span></label><small title="${escapeHtml(i.name)}">${escapeHtml(i.type)} · ${i.count}</small></div>`).join("");$("blockList").innerHTML=rows||`<div class="hint">No matching layers.</div>`;document.querySelectorAll("[data-key]").forEach(cb=>cb.onchange=()=>{const item=state.items.find(x=>x.key===cb.dataset.key);if(!item)return;item.visible=cb.checked;renderItem(item);addLabels()})}
+function allBounds(items=state.items){const group=L.featureGroup();for(const i of items){if(i.layer)group.addLayer(i.layer)}return group.getBounds()}
+function fitMain(){let main=state.items.filter(i=>i.visible&&MAIN_SITE_MATCH.test(i.name));let b=allBounds(main.length?main:state.items.filter(i=>i.visible));if(b.isValid())map.fitBounds(b.pad(.04),{maxZoom:17});else map.setView(DEFAULT_VIEW,16)}
+async function loadFromManifest(){const manifest=await fetchJson("data/map/manifest.json");const files=[];for(const p of (manifest.projects||[])){for(const f of (p.files||[])){if(f.type==="point")continue; if(!/polygon|line/i.test(f.type))continue; files.push({project:p,file:f})}}
+  let loaded=0,failed=0;for(const {project,file} of files){try{const data=await fetchJson(file.path);const count=(data.features||[]).length;if(!count)continue;const key=(project.key+":"+file.layerKey+":"+file.type).replace(/[^a-zA-Z0-9:_-]/g,"_");state.items.push({key,name:file.layerName||project.name||key,type:file.type,path:file.path,color:project.color||colorFor(key),count,data,visible:true,layer:null});loaded++}catch(e){failed++;console.warn(e.message)}}return {loaded,failed,total:files.length}}
+function setupControls(){$("panelBtn").onclick=()=>{$("panel").classList.toggle("collapsed");$("panelBtn").textContent=$("panel").classList.contains("collapsed")?"Open Layers":"Close Layers"};$("fitBtn").onclick=fitMain;$("labelsBtn").onclick=()=>{state.showLabels=!state.showLabels;$("labelsBtn").classList.toggle("active",state.showLabels);addLabels()};$("search").oninput=e=>{state.query=e.target.value.trim();buildList();addLabels()};$("clearBtn").onclick=()=>{Object.keys(localStorage).filter(k=>k.startsWith("sgn-map:")).forEach(k=>localStorage.removeItem(k));status("Cache cleared. Refresh after GitHub finishes publishing.")};$("satBtn").onclick=()=>{if(map.hasLayer(street))map.removeLayer(street);if(!map.hasLayer(satellite))satellite.addTo(map);$("satBtn").classList.add("active");$("streetBtn").classList.remove("active")};$("streetBtn").onclick=()=>{if(map.hasLayer(satellite))map.removeLayer(satellite);if(!map.hasLayer(street))street.addTo(map);$("streetBtn").classList.add("active");$("satBtn").classList.remove("active")};map.on("zoomend",addLabels)}
+async function init(){setupControls();try{status("Loading block polygons and lines. Points/tree plots are skipped...");const r=await loadFromManifest();rerender();fitMain();$("subtitle").textContent=`${state.items.length.toLocaleString()} polygon/line layers loaded · no points/tree plots`;status(`Loaded ${r.loaded} layers. Skipped points/tree plots.`)}catch(err){console.error(err);$("subtitle").textContent="Map data not found";$("blockList").innerHTML=`<div class="hint"><b>Could not load map data.</b><br>${escapeHtml(err.message)}<br><br>Make sure <b>data/map/manifest.json</b> and the GeoJSON files are committed as real files, not Git LFS pointer text.</div>`;status("Could not load data/map/manifest.json",6000)}}
+init();
+</script>
 </body>
 </html>
