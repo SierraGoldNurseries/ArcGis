@@ -1,94 +1,56 @@
-name: Build SGN Map Data
+name: Auto-build ArcGIS Map Data
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    paths:
+      - 'data/raw/**'
+      - 'tools/extract_project.py'
+      - '.github/workflows/extract-arcgis.yml'
+  repository_dispatch:
+    types: [arcgis_upload]
+  workflow_dispatch:
 
 permissions:
   contents: write
+  actions: read
+
+timeout-minutes: 45
 
 concurrency:
-  group: sgn-map-data-build
-  cancel-in-progress: false
+  group: arcgis-map-build
+  cancel-in-progress: true
 
 jobs:
   build-map-data:
-    name: Extract ArcGIS PPKX files
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          lfs: true
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.client_payload.branch || github.ref }}
 
-      - name: Install Git LFS
-        run: |
-          git lfs install
-          git lfs track "data/map/**/*.geojson"
-          git lfs track "data/map/*.geojson"
-          git add .gitattributes || true
-
-      - name: Show repo files
-        run: |
-          echo "Current folder:"
-          pwd
-          echo "Raw project files:"
-          find data/raw -maxdepth 1 -type f -print || true
-          echo "Extractor:"
-          ls -la tools || true
-
-      - name: Install GIS dependencies
+      - name: Install GIS libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y gdal-bin python3-gdal p7zip-full
+          sudo apt-get install -y gdal-bin p7zip-full
+          ogrinfo --version
 
-      - name: Verify GDAL
+      - name: Build combined polygons and points from every project in data/raw
         run: |
-          python3 - <<'PY'
-          from osgeo import gdal, ogr
-          print("GDAL version:", gdal.VersionInfo())
-          print("OpenFileGDB driver:", bool(ogr.GetDriverByName("OpenFileGDB")))
-          print("FileGDB driver:", bool(ogr.GetDriverByName("FileGDB")))
-          PY
-
-      - name: Run SGN ArcGIS extractor
-        run: |
+          if [ -z "$(find data/raw -mindepth 1 -maxdepth 1 ! -name '.gitkeep' 2>/dev/null)" ]; then
+            echo "No files in data/raw. Nothing to extract."
+            exit 0
+          fi
           python3 tools/extract_project.py
 
-      - name: List generated map data
-        run: |
-          echo "Generated data/map files:"
-          find data/map -maxdepth 4 -type f -print | sort || true
-          echo "File sizes:"
-          du -h data/map/**/* 2>/dev/null || true
-
-      - name: Commit generated map data
+      - name: Commit rebuilt map data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add .gitattributes || true
-          git add data/map || true
-
-          # remove old giant compatibility files if they still exist
-          git rm -f data/structures_points.geojson data/structures_polygons.geojson 2>/dev/null || true
-          git rm -f data/map/combined_points.geojson data/map/combined_polygons.geojson data/map/combined_lines.geojson 2>/dev/null || true
-          git rm -f data/map/structures_points.geojson data/map/structures_polygons.geojson 2>/dev/null || true
-
+          git add data/combined_polygons.geojson data/combined_points.geojson data/structures_polygons.geojson data/structures_points.geojson data/map_config.json data/project_manifest.json data/layer_inventory.csv data/layers/ || true
           if git diff --cached --quiet; then
-            echo "No generated map data changes to commit."
-            exit 0
+            echo "No generated map-data changes to commit."
+          else
+            git commit -m "Auto-build combined ArcGIS map data"
+            git push
           fi
-
-          git commit -m "Build split SGN map data"
-
-          echo "Pulling latest main before push..."
-          git pull --rebase origin main
-
-          echo "Pushing generated split map data..."
-          git push origin HEAD:main
