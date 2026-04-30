@@ -1,0 +1,83 @@
+name: Build SGN Map Data
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-map-data:
+    name: Extract ArcGIS PPKX files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Show repo files
+        run: |
+          echo "Current folder:"
+          pwd
+
+          echo "Root files:"
+          ls -la
+
+          echo "Raw project files:"
+          find data/raw -maxdepth 1 -type f -print || true
+
+          echo "Extractor:"
+          ls -la tools || true
+
+      - name: Install GIS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin python3-gdal p7zip-full
+
+      - name: Verify GDAL
+        run: |
+          python3 - <<'PY'
+          from osgeo import gdal, ogr
+          print("GDAL version:", gdal.VersionInfo())
+          print("OpenFileGDB driver:", bool(ogr.GetDriverByName("OpenFileGDB")))
+          print("FileGDB driver:", bool(ogr.GetDriverByName("FileGDB")))
+          PY
+
+      - name: Create output folders
+        run: |
+          mkdir -p data/map
+          mkdir -p data/raw
+
+      - name: Run SGN ArcGIS extractor
+        run: |
+          python3 tools/extract_project.py
+
+      - name: List generated map data
+        run: |
+          echo "Generated data/map files:"
+          find data/map -maxdepth 2 -type f -print | sort || true
+
+          echo "Compatibility files:"
+          ls -la data/structures_polygons.geojson data/structures_points.geojson 2>/dev/null || true
+
+      - name: Commit generated map data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/map || true
+          git add data/structures_polygons.geojson || true
+          git add data/structures_points.geojson || true
+
+          if git diff --cached --quiet; then
+            echo "No generated map data changes to commit."
+          else
+            git commit -m "Build combined SGN map data"
+            git push
+          fi
