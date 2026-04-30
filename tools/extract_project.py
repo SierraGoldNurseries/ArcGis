@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Build SGN web-map data from ArcGIS/GIS project files in data/raw/."""
+"""Build SGN web-map data from ArcGIS/GIS project files in data/raw/.
+
+This version intentionally exports polygon/block boundary layers only.
+It skips individual tree points / point-to-line tree rows so the web map does
+not plot every tree.
+"""
 from __future__ import annotations
 
 import csv
@@ -19,6 +24,7 @@ LAYERS_DIR = OUT / "layers"
 
 VECTOR_EXTS = {".geojson", ".json", ".kml", ".shp"}
 PACKAGE_EXTS = {".ppkx", ".mpkx"}
+
 SYSTEM_LAYER_NAMES = {
     "gdb_items",
     "gdb_itemtypes",
@@ -29,11 +35,49 @@ SYSTEM_LAYER_NAMES = {
     "gdb_replicalog",
 }
 
+# These layers create thousands of dots/pins. Skip them.
+SKIP_LAYER_TOKENS = [
+    "tree",
+    "trees",
+    "pointstoline",
+    "points_to_line",
+    "spacing",
+    "exportfeatures1",
+    "mother_trees",
+    "mother_tree",
+    "individual",
+    "sample",
+    "gps_point",
+    "gps_points",
+    "point",
+    "points",
+]
+
+# Keep polygon/boundary/block layers even if their name contains prune/south/etc.
+KEEP_LAYER_TOKENS = [
+    "block",
+    "boundary",
+    "boundaries",
+    "outline",
+    "polygon",
+    "polygons",
+    "field",
+    "fields",
+    "ranch",
+    "yard",
+    "can_yard",
+    "shadehouse",
+    "high_tunnel",
+    "tunnel",
+    "parcel",
+    "prune_south",
+    "prune_north",
+]
+
 PROJECT_RULES = [
     ("Chemical Locations", ["chemical"]),
     ("Irrigation", ["irrigation"]),
     ("Owl Boxes", ["owl"]),
-    ("Trees", ["tree"]),
     ("Prune North", ["prune_north", "prune north", "prunenorth"]),
     ("Prune South", ["prune_south", "prune south", "prunesouth"]),
     ("Block #23", ["block_23", "block_#23", "block #23", "block23", "23"]),
@@ -45,9 +89,8 @@ PROJECT_CONFIG = {
     "Chemical Locations": {"labels": True, "visible": True, "opacity": 0.30, "point_mode": "normal"},
     "Irrigation": {"labels": False, "visible": True, "opacity": 0.26, "point_mode": "normal"},
     "Owl Boxes": {"labels": True, "visible": True, "opacity": 0.28, "point_mode": "normal"},
-    "Trees": {"labels": False, "visible": True, "opacity": 0.18, "point_mode": "cluster"},
-    "Prune North": {"labels": False, "visible": True, "opacity": 0.20, "point_mode": "filtered"},
-    "Prune South": {"labels": False, "visible": True, "opacity": 0.20, "point_mode": "filtered"},
+    "Prune North": {"labels": True, "visible": True, "opacity": 0.20, "point_mode": "normal"},
+    "Prune South": {"labels": True, "visible": True, "opacity": 0.20, "point_mode": "normal"},
     "Block #23": {"labels": True, "visible": True, "opacity": 0.12, "point_mode": "normal"},
     "Block #25": {"labels": True, "visible": True, "opacity": 0.12, "point_mode": "normal"},
 }
@@ -66,6 +109,27 @@ def safe(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_]+", "_", str(name)).strip("_") or "layer"
 
 
+def layer_blob(source: str, layer: str = "") -> str:
+    return f"{source} {layer}".lower().replace("-", "_").replace(" ", "_")
+
+
+def should_skip_layer(source: str, layer: str) -> bool:
+    blob = layer_blob(source, layer)
+
+    # If it clearly says block/boundary/outline/etc., keep it.
+    if any(tok in blob for tok in KEEP_LAYER_TOKENS):
+        # But still skip obvious tree point layers.
+        if any(tok in blob for tok in ["pointstoline", "points_to_line", "tree_spacing", "spacing_points"]):
+            return True
+        return False
+
+    # Skip individual points / trees.
+    if any(tok in blob for tok in SKIP_LAYER_TOKENS):
+        return True
+
+    return False
+
+
 def is_lfs_pointer(path: Path) -> bool:
     if not path.is_file() or path.stat().st_size > 1024:
         return False
@@ -77,9 +141,9 @@ def is_lfs_pointer(path: Path) -> bool:
 
 
 def project_from_source(source: str, layer: str = "") -> str:
-    blob = f"{source} {layer}".lower().replace("-", "_")
+    blob = layer_blob(source, layer)
     for project, tokens in PROJECT_RULES:
-        if any(t in blob for t in tokens):
+        if any(t.replace(" ", "_") in blob for t in tokens):
             return project
     return "Structures / Yards"
 
@@ -88,14 +152,17 @@ def apply_project_properties(feat: dict, source: str, layer: str) -> None:
     props = feat.setdefault("properties", {})
     project = project_from_source(source, layer)
     cfg = PROJECT_CONFIG.get(project, PROJECT_CONFIG["Structures / Yards"])
+
     props.setdefault("_project", project)
     props.setdefault("_label_default", cfg["labels"])
     props.setdefault("_default_visible", cfg["visible"])
     props.setdefault("_display_opacity", cfg["opacity"])
     props.setdefault("_point_mode", cfg["point_mode"])
+    props.setdefault("_layer", layer)
+    props.setdefault("_source", source)
     props.setdefault(
         "_feature_key",
-        safe(f"{project}_{layer}_{props.get('OBJECTID') or props.get('FID') or props.get('_point_id') or len(str(props))}"),
+        safe(f"{project}_{layer}_{props.get('OBJECTID') or props.get('FID') or len(str(props))}"),
     )
 
 
@@ -178,18 +245,13 @@ def discover_inputs() -> tuple[list[Path], list[Path]]:
                 result.append(p)
         return result
 
-    gdbs = dedupe(gdbs)
-    vectors = dedupe(vectors)
-
-    print(f"Found {len(gdbs)} geodatabase(s) and {len(vectors)} standalone vector file(s).")
-    return gdbs, vectors
+    return dedupe(gdbs), dedupe(vectors)
 
 
 def parse_ogr_layer_list(output: str) -> list[str]:
     layers: list[str] = []
 
     for line in output.splitlines():
-        # Example: 1: Prune_South (Multi Polygon)
         m = re.match(r"^\s*\d+\s*:\s+(.+?)(?:\s+\([^()]*\))?\s*$", line)
         if m:
             layer = m.group(1).strip()
@@ -197,7 +259,6 @@ def parse_ogr_layer_list(output: str) -> list[str]:
                 layers.append(layer)
             continue
 
-        # Fallback for verbose ogrinfo output.
         m = re.match(r"^\s*Layer name:\s+(.+?)\s*$", line, flags=re.I)
         if m:
             layer = m.group(1).strip()
@@ -216,8 +277,6 @@ def parse_ogr_layer_list(output: str) -> list[str]:
 
 
 def layers_for_gdb(gdb: Path) -> list[str]:
-    # FIX: do NOT use ogrinfo -q here.
-    # -q hides the layer list on GitHub Actions.
     p = run(["ogrinfo", "-ro", str(gdb)], check=False)
 
     if p.returncode:
@@ -226,25 +285,28 @@ def layers_for_gdb(gdb: Path) -> list[str]:
 
     layers = parse_ogr_layer_list(p.stdout)
 
-    if layers:
-        print(f"Found {len(layers)} layer(s) in {gdb.name}: {', '.join(layers)}")
-        return layers
+    if not layers:
+        p2 = run(["ogrinfo", "-ro", "-al", "-so", str(gdb)], check=False)
+        if p2.returncode:
+            print(p2.stdout)
+            return []
+        layers = parse_ogr_layer_list(p2.stdout)
 
-    # Slower fallback for some GDAL/FileGDB combinations.
-    p2 = run(["ogrinfo", "-ro", "-al", "-so", str(gdb)], check=False)
+    kept = []
+    skipped = []
 
-    if p2.returncode:
-        print(p2.stdout)
-        return []
+    for layer in layers:
+        if should_skip_layer(gdb.name, layer):
+            skipped.append(layer)
+        else:
+            kept.append(layer)
 
-    layers = parse_ogr_layer_list(p2.stdout)
+    print(f"Found {len(layers)} layer(s) in {gdb.name}.")
+    print(f"Keeping boundary/block layer(s): {', '.join(kept) if kept else 'none'}")
+    if skipped:
+        print(f"Skipping tree/point layer(s): {', '.join(skipped)}")
 
-    if layers:
-        print(f"Found {len(layers)} layer(s) in {gdb.name}: {', '.join(layers)}")
-    else:
-        print(f"Warning: no readable layers found in {gdb}")
-
-    return layers
+    return kept
 
 
 def load_geojson(path: Path) -> dict | None:
@@ -253,6 +315,24 @@ def load_geojson(path: Path) -> dict | None:
     except Exception as exc:
         print(f"Warning: could not read exported GeoJSON {path}: {exc}")
         return None
+
+
+def keep_boundary_features_only(data: dict, source: str, layer: str) -> dict:
+    kept = []
+
+    for feat in data.get("features", []) or []:
+        geom = feat.get("geometry") or {}
+        geom_type = geom.get("type", "")
+
+        # Do not keep individual point/line features.
+        # Only outside block/boundary polygons should remain.
+        if geom_type not in {"Polygon", "MultiPolygon"}:
+            continue
+
+        apply_project_properties(feat, source, layer)
+        kept.append(feat)
+
+    return {"type": "FeatureCollection", "features": kept}
 
 
 def export_gdb_layer(gdb: Path, layer: str, ordinal: int) -> tuple[Path | None, dict]:
@@ -298,7 +378,6 @@ def export_gdb_layer(gdb: Path, layer: str, ordinal: int) -> tuple[Path | None, 
         }
 
     data = load_geojson(out)
-
     if not data:
         return None, {
             "source": gdb.name,
@@ -309,14 +388,20 @@ def export_gdb_layer(gdb: Path, layer: str, ordinal: int) -> tuple[Path | None, 
             "status": "json_error",
         }
 
-    features = data.get("features", []) or []
+    filtered = keep_boundary_features_only(data, gdb.name, layer)
+    features = filtered.get("features", []) or []
 
-    for feat in features:
-        feat.setdefault("properties", {})["_layer"] = layer
-        feat["properties"].setdefault("_source", gdb.name)
-        apply_project_properties(feat, gdb.name, layer)
+    if not features:
+        return None, {
+            "source": gdb.name,
+            "layer": layer,
+            "file": "",
+            "features": 0,
+            "geometry": "",
+            "status": "no_polygon_boundaries_after_filter",
+        }
 
-    out.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+    out.write_text(json.dumps(filtered, separators=(",", ":")), encoding="utf-8")
 
     geom = next((f.get("geometry", {}).get("type", "") for f in features if f.get("geometry")), "")
 
@@ -332,6 +417,17 @@ def export_gdb_layer(gdb: Path, layer: str, ordinal: int) -> tuple[Path | None, 
 
 def export_vector_file(src: Path, ordinal: int) -> tuple[Path | None, dict]:
     layer = src.stem
+
+    if should_skip_layer(src.name, layer):
+        return None, {
+            "source": src.name,
+            "layer": layer,
+            "file": "",
+            "features": 0,
+            "geometry": "",
+            "status": "skipped_tree_or_point_layer",
+        }
+
     out = LAYERS_DIR / f"{ordinal:03d}_{safe(layer)}.geojson"
 
     cmd = [
@@ -360,18 +456,7 @@ def export_vector_file(src: Path, ordinal: int) -> tuple[Path | None, dict]:
             "status": "export_failed",
         }
 
-    if not out.exists() or out.stat().st_size <= 80:
-        return None, {
-            "source": src.name,
-            "layer": layer,
-            "file": "",
-            "features": 0,
-            "geometry": "",
-            "status": "empty_export",
-        }
-
     data = load_geojson(out)
-
     if not data:
         return None, {
             "source": src.name,
@@ -382,14 +467,20 @@ def export_vector_file(src: Path, ordinal: int) -> tuple[Path | None, dict]:
             "status": "json_error",
         }
 
-    features = data.get("features", []) or []
+    filtered = keep_boundary_features_only(data, src.name, layer)
+    features = filtered.get("features", []) or []
 
-    for feat in features:
-        feat.setdefault("properties", {})["_layer"] = feat.get("properties", {}).get("_layer", layer)
-        feat["properties"].setdefault("_source", src.name)
-        apply_project_properties(feat, src.name, layer)
+    if not features:
+        return None, {
+            "source": src.name,
+            "layer": layer,
+            "file": "",
+            "features": 0,
+            "geometry": "",
+            "status": "no_polygon_boundaries_after_filter",
+        }
 
-    out.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+    out.write_text(json.dumps(filtered, separators=(",", ":")), encoding="utf-8")
 
     geom = next((f.get("geometry", {}).get("type", "") for f in features if f.get("geometry")), "")
 
@@ -415,6 +506,10 @@ def combine_geojson(files: list[Path]) -> dict:
         layer_default = re.sub(r"^\d+_", "", f.stem)
 
         for feat in data.get("features", []) or []:
+            geom_type = (feat.get("geometry") or {}).get("type", "")
+            if geom_type not in {"Polygon", "MultiPolygon"}:
+                continue
+
             feat.setdefault("properties", {})
             feat["properties"].setdefault("_layer", layer_default)
             feat["properties"].setdefault("_export_file", f.name)
@@ -441,9 +536,10 @@ def geometry_points(geom: dict) -> list[list[float]]:
 def representative_point(geom: dict) -> list[float] | None:
     typ = geom.get("type")
 
-    if typ == "Point":
-        c = geom.get("coordinates")
-        return [float(c[0]), float(c[1])] if c and len(c) >= 2 else None
+    # Important: do NOT generate points from source Point features.
+    # Points file should only contain one label/center point per polygon boundary.
+    if typ not in {"Polygon", "MultiPolygon"}:
+        return None
 
     pts = geometry_points(geom)
 
@@ -490,7 +586,7 @@ def make_points(fc: dict) -> dict:
             continue
 
         props = dict(f.get("properties") or {})
-        props["generated_point"] = geom.get("type") != "Point"
+        props["generated_point"] = True
         props.setdefault("_point_id", i + 1)
 
         pts.append({
@@ -528,8 +624,9 @@ def write_outputs(feature_files: list[Path], inventory: list[dict]) -> None:
         json.dumps(
             {
                 "projects": project_counts,
-                "total_features": len(combined.get("features", []) or []),
-                "total_points": len(points.get("features", []) or []),
+                "total_boundary_features": len(combined.get("features", []) or []),
+                "total_label_points": len(points.get("features", []) or []),
+                "note": "Individual tree/point layers are intentionally skipped. Only polygon/block boundaries are exported.",
             },
             indent=2,
         ),
@@ -542,7 +639,10 @@ def write_outputs(feature_files: list[Path], inventory: list[dict]) -> None:
         w.writeheader()
         w.writerows(inventory)
 
-    print(f"Wrote {len(combined.get('features', []) or [])} features and {len(points.get('features', []) or [])} generated/display points.")
+    print(
+        f"Wrote {len(combined.get('features', []) or [])} boundary polygon feature(s) "
+        f"and {len(points.get('features', []) or [])} label/display point(s)."
+    )
 
 
 def main() -> None:
@@ -564,7 +664,7 @@ def main() -> None:
                 "file": "",
                 "features": 0,
                 "geometry": "",
-                "status": "no_layers_or_unreadable",
+                "status": "no_boundary_layers_or_unreadable",
             })
             continue
 
@@ -587,8 +687,8 @@ def main() -> None:
 
     if not exported:
         raise SystemExit(
-            "No layers were exported. Check that the raw files contain supported GIS vector layers, "
-            "and make sure Git LFS pointer files were not uploaded instead of real .ppkx/.mpkx files."
+            "No boundary polygon layers were exported. The raw file may only contain tree/point layers, "
+            "or the real ArcGIS package may not be available because Git LFS is over budget."
         )
 
     write_outputs(exported, inventory)
