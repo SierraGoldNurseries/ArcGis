@@ -21,32 +21,58 @@ concurrency:
 jobs:
   build-map-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 45   # ✅ FIXED: moved inside job
+    timeout-minutes: 45
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.client_payload.branch || github.ref }}
+          lfs: true
+
+      - name: Pull Git LFS files
+        run: |
+          git lfs install
+          git lfs pull
 
       - name: Install GIS libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 python3-pip python3-venv
+          sudo apt-get install -y gdal-bin p7zip-full
+          ogrinfo --version
 
-      - name: Install Python deps
+      - name: Verify raw ArcGIS packages are real files
         run: |
-          pip install --upgrade pip
-          pip install geopandas shapely fiona pyproj
+          bad=0
+          for f in data/raw/*.ppkx data/raw/*.mpkx; do
+            [ -e "$f" ] || continue
+            size=$(wc -c < "$f")
+            if [ "$size" -lt 1000 ] && grep -q "git-lfs.github.com/spec" "$f" 2>/dev/null; then
+              echo "ERROR: $f is still a Git LFS pointer, not the real ArcGIS package."
+              bad=1
+            fi
+          done
+          if [ "$bad" -ne 0 ]; then
+            echo "Git LFS files were not downloaded. Check repository Git LFS setup or re-upload the real .ppkx/.mpkx files."
+            exit 1
+          fi
 
-      - name: Run extractor
+      - name: Build combined polygons and points from every project in data/raw
         run: |
-          python tools/extract_project.py
+          if [ -z "$(find data/raw -mindepth 1 -maxdepth 1 ! -name '.gitkeep' 2>/dev/null)" ]; then
+            echo "No files in data/raw. Nothing to extract."
+            exit 0
+          fi
+          python3 tools/extract_project.py
 
-      - name: Commit & push if changed
+      - name: Commit rebuilt map data
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add data/optimized || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-build optimized GeoJSON"
-          git push
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/combined_polygons.geojson data/combined_points.geojson data/structures_polygons.geojson data/structures_points.geojson data/map_config.json data/project_manifest.json data/layer_inventory.csv data/layers/ || true
+          if git diff --cached --quiet; then
+            echo "No generated map-data changes to commit."
+          else
+            git commit -m "Auto-build combined ArcGIS map data"
+            git push
+          fi
