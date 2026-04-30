@@ -1,13 +1,58 @@
 {
   "projects": {
-    "Structures / Yards": {"labelsDefault": true, "visibleDefault": true, "opacity": 0.24, "pointMode": "normal", "note": "Structure and yard polygons; labels on by default."},
-    "Chemical Locations": {"labelsDefault": true, "visibleDefault": true, "opacity": 0.30, "pointMode": "normal", "note": "Chemical storage/use locations; labels on by default."},
-    "Irrigation": {"labelsDefault": false, "visibleDefault": true, "opacity": 0.26, "pointMode": "normal", "note": "Irrigation features; labels off by default and shown when selected."},
-    "Owl Boxes": {"labelsDefault": true, "visibleDefault": true, "opacity": 0.28, "pointMode": "normal", "note": "Owl box points or areas."},
-    "Trees": {"labelsDefault": false, "visibleDefault": true, "opacity": 0.18, "pointMode": "cluster", "note": "Tree points; labels off by default and points clustered/searchable."},
-    "Prune North": {"labelsDefault": false, "visibleDefault": true, "opacity": 0.20, "pointMode": "filtered", "note": "Prune North layer; use project filter/search."},
-    "Prune South": {"labelsDefault": false, "visibleDefault": true, "opacity": 0.20, "pointMode": "filtered", "note": "Prune South layer; use project filter/search."},
-    "Block #23": {"labelsDefault": true, "visibleDefault": true, "opacity": 0.12, "pointMode": "normal", "note": "Block boundary layer; lower opacity, labels on."},
-    "Block #25": {"labelsDefault": true, "visibleDefault": true, "opacity": 0.12, "pointMode": "normal", "note": "Block boundary layer; lower opacity, labels on."}
+    "Structures / Yards": {
+      "labels": true,
+      "visible": true,
+      "opacity": 0.24,
+      "point_mode": "normal"
+    },
+    "Chemical Locations": {
+      "labels": true,
+      "visible": true,
+      "opacity": 0.3,
+      "point_mode": "normal"
+    },
+    "Irrigation": {
+      "labels": false,
+      "visible": true,
+      "opacity": 0.26,
+      "point_mode": "normal"
+    },
+    "Owl Boxes": {
+      "labels": true,
+      "visible": true,
+      "opacity": 0.28,
+      "point_mode": "normal"
+    },
+    "Trees": {
+      "labels": false,
+      "visible": true,
+      "opacity": 0.18,
+      "point_mode": "cluster"
+    },
+    "Prune North": {
+      "labels": false,
+      "visible": true,
+      "opacity": 0.2,
+      "point_mode": "filtered"
+    },
+    "Prune South": {
+      "labels": false,
+      "visible": true,
+      "opacity": 0.2,
+      "point_mode": "filtered"
+    },
+    "Block #23": {
+      "labels": true,
+      "visible": true,
+      "opacity": 0.12,
+      "point_mode": "normal"
+    },
+    "Block #25": {
+      "labels": true,
+      "visible": true,
+      "opacity": 0.12,
+      "point_mode": "normal"
+    }
   }
 }
