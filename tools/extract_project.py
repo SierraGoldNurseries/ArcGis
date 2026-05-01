@@ -9,7 +9,15 @@ Exports usable GIS layers from:
 - .gdb folders
 - .geojson / .json / .kml / .shp
 
-Tree/detail layers are skipped so the map does not load thousands of tree rows.
+This version removes:
+- Trees / tree detail / spacing layers
+- Solar Panels 02
+- Solar Panels 03
+- Water Treatment
+- Office
+- Lab
+
+It also renames "Structures / Yards" to "Structures".
 """
 
 from __future__ import annotations
@@ -44,6 +52,14 @@ SYSTEM_LAYER_NAMES = {
     "gdb_replicalog",
 }
 
+HARD_DROP_PATTERNS = [
+    r"\bsolar\s*panels?\s*0?2\b",
+    r"\bsolar\s*panels?\s*0?3\b",
+    r"\bwater\s*treatment\b",
+    r"\boffice\b",
+    r"\blab\b",
+]
+
 PROJECT_RULES = [
     ("Chemical Locations", ["chemical"]),
     ("Irrigation", ["irrigation"]),
@@ -55,10 +71,10 @@ PROJECT_RULES = [
 ]
 
 PROJECT_CONFIG = {
-    "Structures / Yards": {
+    "Structures": {
         "labels": True,
         "visible": True,
-        "opacity": 0.24,
+        "opacity": 0.26,
         "point_mode": "normal",
     },
     "Chemical Locations": {
@@ -137,7 +153,29 @@ def safe(name: Any) -> str:
 
 
 def norm(text: str) -> str:
-    return re.sub(r"[^a-z0-9#]+", "_", text.lower()).strip("_")
+    return re.sub(r"[^a-z0-9#]+", " ", text.lower()).strip()
+
+
+def all_property_text(props: dict[str, Any]) -> str:
+    vals = []
+
+    for k, v in props.items():
+        if isinstance(v, (str, int, float)):
+            vals.append(str(k))
+            vals.append(str(v))
+
+    return norm(" ".join(vals))
+
+
+def should_drop_feature(feat: dict[str, Any]) -> tuple[bool, str]:
+    props = feat.get("properties") or {}
+    blob = all_property_text(props)
+
+    for pattern in HARD_DROP_PATTERNS:
+        if re.search(pattern, blob, flags=re.I):
+            return True, pattern
+
+    return False, ""
 
 
 def is_lfs_pointer(path: Path) -> bool:
@@ -163,7 +201,7 @@ def project_from_source(source: str, layer: str = "") -> str:
             if norm(token) in blob:
                 return project
 
-    return "Structures / Yards"
+    return "Structures"
 
 
 def should_skip_layer(source_name: str, container_name: str, layer: str) -> tuple[bool, str]:
@@ -200,18 +238,35 @@ def should_skip_layer(source_name: str, container_name: str, layer: str) -> tupl
     return False, ""
 
 
+def clean_label_text(value: Any) -> str:
+    t = str(value or "")
+
+    t = re.sub(r"\bStructures\s*/\s*Yards\b", "", t, flags=re.I)
+    t = re.sub(r"\bStructures\b", "", t, flags=re.I)
+    t = re.sub(r"\bYards\b", "", t, flags=re.I)
+    t = re.sub(r"\bAcres?\b", "", t, flags=re.I)
+    t = re.sub(r"\bAures\b", "", t, flags=re.I)
+    t = re.sub(r"\s+", " ", t).strip()
+
+    return t
+
+
 def apply_project_properties(feat: dict[str, Any], source: str, layer: str) -> None:
     props = feat.setdefault("properties", {})
     project = project_from_source(source, layer)
-    cfg = PROJECT_CONFIG.get(project, PROJECT_CONFIG["Structures / Yards"])
+    cfg = PROJECT_CONFIG.get(project, PROJECT_CONFIG["Structures"])
 
-    props.setdefault("_project", project)
-    props.setdefault("_source", source)
-    props.setdefault("_layer", layer)
-    props.setdefault("_label_default", cfg["labels"])
-    props.setdefault("_default_visible", cfg["visible"])
-    props.setdefault("_display_opacity", cfg["opacity"])
-    props.setdefault("_point_mode", cfg["point_mode"])
+    props["_project"] = project
+    props["_source"] = source
+    props["_layer"] = clean_label_text(layer)
+    props["_label_default"] = cfg["labels"]
+    props["_default_visible"] = cfg["visible"]
+    props["_display_opacity"] = cfg["opacity"]
+    props["_point_mode"] = cfg["point_mode"]
+
+    for key in ["Name", "name", "Label", "label", "Layer", "layer"]:
+        if key in props and isinstance(props[key], str):
+            props[key] = clean_label_text(props[key])
 
     object_id = (
         props.get("OBJECTID")
@@ -222,7 +277,7 @@ def apply_project_properties(feat: dict[str, Any], source: str, layer: str) -> N
         or len(str(props))
     )
 
-    props.setdefault("_feature_key", safe(f"{project}_{layer}_{object_id}"))
+    props["_feature_key"] = safe(f"{project}_{layer}_{object_id}")
 
 
 def reset_dirs() -> None:
@@ -366,15 +421,15 @@ def parse_ogr_layer_list(output: str) -> list[str]:
             if layer and safe(layer).lower() not in SYSTEM_LAYER_NAMES:
                 layers.append(layer)
 
-    clean: list[str] = []
+    clean_layers: list[str] = []
     seen: set[str] = set()
 
     for layer in layers:
         if layer not in seen:
             seen.add(layer)
-            clean.append(layer)
+            clean_layers.append(layer)
 
-    return clean
+    return clean_layers
 
 
 def layers_for_gdb(gdb_input: GdbInput) -> list[str]:
@@ -497,11 +552,17 @@ def export_gdb_layer(gdb_input: GdbInput, layer: str, ordinal: int) -> tuple[Pat
 
     features = data.get("features", []) or []
     cleaned_features: list[dict[str, Any]] = []
+    dropped = 0
 
     for feat in features:
         geom = feat.get("geometry")
 
         if not geom:
+            continue
+
+        drop, reason = should_drop_feature(feat)
+        if drop:
+            dropped += 1
             continue
 
         apply_project_properties(feat, source_name, layer)
@@ -515,14 +576,18 @@ def export_gdb_layer(gdb_input: GdbInput, layer: str, ordinal: int) -> tuple[Pat
         "",
     )
 
+    status = "ok"
+    if dropped:
+        status = f"ok_dropped_{dropped}_hidden_features"
+
     return out, {
         "source": source_name,
         "container": gdb.name,
-        "layer": layer,
+        "layer": clean_label_text(layer),
         "file": out.name,
         "features": len(cleaned_features),
         "geometry": geom_type,
-        "status": "ok",
+        "status": status,
     }
 
 
@@ -588,11 +653,17 @@ def export_vector_file(vector_input: VectorInput, ordinal: int) -> tuple[Path | 
 
     features = data.get("features", []) or []
     cleaned_features: list[dict[str, Any]] = []
+    dropped = 0
 
     for feat in features:
         geom = feat.get("geometry")
 
         if not geom:
+            continue
+
+        drop, reason = should_drop_feature(feat)
+        if drop:
+            dropped += 1
             continue
 
         apply_project_properties(feat, source_name, layer)
@@ -606,14 +677,18 @@ def export_vector_file(vector_input: VectorInput, ordinal: int) -> tuple[Path | 
         "",
     )
 
+    status = "ok"
+    if dropped:
+        status = f"ok_dropped_{dropped}_hidden_features"
+
     return out, {
         "source": source_name,
         "container": src.name,
-        "layer": layer,
+        "layer": clean_label_text(layer),
         "file": out.name,
         "features": len(cleaned_features),
         "geometry": geom_type,
-        "status": "ok",
+        "status": status,
     }
 
 
@@ -709,6 +784,10 @@ def combine_and_split_geojson(files: list[Path]) -> tuple[dict[str, Any], dict[s
             continue
 
         for feat in data.get("features", []) or []:
+            drop, reason = should_drop_feature(feat)
+            if drop:
+                continue
+
             geom = feat.get("geometry") or {}
             geom_type = geom.get("type", "")
 
@@ -766,7 +845,9 @@ def write_outputs(exported_files: list[Path], inventory: list[dict[str, Any]]) -
     project_counts: dict[str, int] = {}
 
     for feat in (shapes.get("features", []) or []) + (points.get("features", []) or []):
-        project = feat.get("properties", {}).get("_project", "Structures / Yards")
+        project = feat.get("properties", {}).get("_project", "Structures")
+        if project == "Structures / Yards":
+            project = "Structures"
         project_counts[project] = project_counts.get(project, 0) + 1
 
     (OUT / "map_config.json").write_text(
@@ -781,7 +862,7 @@ def write_outputs(exported_files: list[Path], inventory: list[dict[str, Any]]) -
                 "shape_features": len(shapes.get("features", []) or []),
                 "point_features": len(points.get("features", []) or []),
                 "total_features": len(shapes.get("features", []) or []) + len(points.get("features", []) or []),
-                "note": "Tree/detail layers skipped. Usable Structures, Chemical, Irrigation, Owl, Block, and Prune layers exported.",
+                "note": "Tree/detail layers and hard-hidden facility items removed. Structures / Yards renamed to Structures.",
             },
             indent=2,
         ),
