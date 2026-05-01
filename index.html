@@ -100,27 +100,128 @@
     function isHardHiddenItem(item){return isHardHiddenText(itemBlob(item))}
     function isStructureHidden(item){return state.hiddenStructures.has(item.key)}
     function isLabelHidden(item){return state.hiddenLabels.has(item.key)}
-    function rawLabelSource(item){const p=item.feature?.properties||{};return [p._short_label,p.ShortLabel,p.short_label,p.Label,p.label,p.Name,p.name,p.Name_1,item.name,item.layer].filter(Boolean).join(' ')}
-    function cleanupLabelRaw(raw){return String(raw||'').replace(/_/g,' ').replace(/\bstructures?\b/gi,'').replace(/\byards?\b/gi,'').replace(/\blocations?\b/gi,'').replace(/\blayer\b/gi,'').replace(/\b(acres?|acreage|ac|area|sqft|square feet)\b/gi,'').replace(/\bAures\b/gi,'').replace(/\s+/g,' ').trim()}
-    function parseLocationInfo(raw){
-      const t=cleanupLabelRaw(raw);let m;
-      if((m=t.match(/\b(?:CY|Can\s*(?:Yard)?)\s*#?\s*0?(\d{1,2})\s*[- ]?\s*([A-Z])?\b/i))){const num=String(m[1]).padStart(2,'0');const suffix=(m[2]||'').toUpperCase();return {family:'CY',num,suffix,group:'CY'+num,title:`CY #${num}${suffix?'-'+suffix:''}`,badge:'CY',meta:'CY'+num}}
-      if((m=t.match(/\b(?:HT|High\s*Tunnels?)\s*#?\s*0?(\d{1,2})\s*[- ]?\s*([A-Z])?\b/i))){const num=String(m[1]).padStart(2,'0');const suffix=(m[2]||'').toUpperCase();return {family:'HT',num,suffix,group:'HT'+num,title:`HT #${num}${suffix?'-'+suffix:''}`,badge:'HT',meta:'HT'+num}}
-      if((m=t.match(/\b(?:SH|Shade\s*House|Shadehouse)\s*#?\s*0?(\d{1,2})(?:\s*[- ]?\s*([A-Z]))?\b/i))){const num=String(m[1]).padStart(2,'0');return {family:'SH',num,suffix:'',group:'SH'+num,title:`SH #${num}`,badge:'SH',meta:'SH'+num}}
-      if((m=t.match(/\b(?:FB|Four\s*Bays?)\s*#?\s*0?(\d{1,2})\b/i))){const num=String(m[1]).padStart(2,'0');return {family:'FB',num,suffix:'',group:'FB'+num,title:`FB #${num}`,badge:'FB',meta:'FB'+num}}
-      if((m=t.match(/\bZone\s*#?\s*0?(\d{1,2})\b/i))){const num=String(m[1]).padStart(2,'0');return {family:'ZONE',num,suffix:'',group:'ZONE'+num,title:`Zone ${num}`,badge:'ZN',meta:'Zone '+num}}
-      if((m=t.match(/\bHead\s*House\s*#?\s*0?(\d{1,2})\b/i))){const num=String(m[1]).padStart(2,'0');return {family:'HEADHOUSE',num,suffix:'',group:'HEADHOUSE'+num,title:`Head House ${num}`,badge:'HH',meta:'Head House '+num}}
-      if((m=t.match(/\bBlock\s*#?\s*(\d+)\b/i))){const num=String(m[1]);return {family:'BLOCK',num,suffix:'',group:'BLOCK'+num,title:`Block ${num}`,badge:'BLK',meta:'Block '+num}}
-      const pretty=clean(t||'Location');
-      return {family:'',num:'',suffix:'',group:pretty,title:pretty,badge:acronym(pretty),meta:pretty}
+    function rawLabelSource(item){
+      const p=item.feature?.properties||{};
+      const vals=[p._short_label,p.ShortLabel,p.short_label,p.Label,p.label,p.Name,p.name,p.Name_1,p.Location,p.location,p.Title,p.title,item.name,item.layer];
+      const seen=new Set(), out=[];
+      for(const v of vals){
+        const s=String(v||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+        if(!s) continue;
+        const key=s.toLowerCase();
+        if(seen.has(key)) continue;
+        seen.add(key);
+        out.push(s);
+      }
+      return out.join(' ');
     }
-    function labelInfo(item){return parseLocationInfo([rawLabelSource(item),item.name,item.layer].filter(Boolean).join(' '))}
-    function labelText(item){return labelInfo(item).title}
-    function colorGroupKey(item){return labelInfo(item).group}
+    function compressRepeatedPhrases(text){
+      let t=String(text||'').replace(/\s+/g,' ').trim();
+      if(!t) return '';
+      let prev='';
+      while(t!==prev){
+        prev=t;
+        t=t.replace(/\b([A-Za-z0-9#/-]+(?:\s+[A-Za-z0-9#/-]+){0,4})\b(?:\s+\1\b)+/gi,'$1');
+        t=t.replace(/\b(\w+)\b(?:\s+\1\b)+/gi,'$1');
+      }
+      return t.trim();
+    }
+    function cleanupLabelRaw(raw){
+      let t=String(raw||'').replace(/_/g,' ');
+      t=t.replace(/\bstructures?\b/gi,' ')
+         .replace(/\byards?\b/gi,' ')
+         .replace(/\blocations?\b/gi,' ')
+         .replace(/\blayer\b/gi,' ')
+         .replace(/\b(acres?|acreage|ac|area|sqft|square feet)\b/gi,' ')
+         .replace(/\bAures\b/gi,' ')
+         .replace(/\s+/g,' ').trim();
+      return compressRepeatedPhrases(t);
+    }
+    function fmtNum(n){return String(n||'').padStart(2,'0')}
+    function formatCode(prefix,n,suffix=''){return `${prefix} #${fmtNum(n)}${suffix?'-'+String(suffix).toUpperCase():''}`}
+    function formatGroupKey(group){
+      const g=String(group||'').toUpperCase(); let m;
+      if((m=g.match(/^CY(\d{2})$/))) return `CY #${m[1]}`;
+      if((m=g.match(/^HT(\d{2})$/))) return `HT #${m[1]}`;
+      if((m=g.match(/^SH(\d{2})$/))) return `SH #${m[1]}`;
+      if((m=g.match(/^FB(\d{2})$/))) return `FB #${m[1]}`;
+      if((m=g.match(/^ZONE(\d{2})$/))) return `Zone ${m[1]}`;
+      if((m=g.match(/^HEADHOUSE(\d{2})$/))) return `Head House ${m[1]}`;
+      if((m=g.match(/^BLOCK(\d+)$/))) return `Block ${m[1]}`;
+      if((m=g.match(/^CF(\d{2})$/))) return `Cold Frame ${m[1]}`;
+      if((m=g.match(/^MT(\d{2})$/))) return `Maintenance Trailer ${m[1]}`;
+      if((m=g.match(/^SP(\d{2})$/))) return `Solar Panels ${m[1]}`;
+      if((m=g.match(/^SL(\d{2})$/))) return `Sorting Line ${m[1]}`;
+      if(g==='SOILBUNKER') return 'Soil Bunker';
+      if(g==='WATERTREATMENT') return 'Water Treatment';
+      if(g==='OFFICE') return 'Office';
+      if(g==='LAB') return 'Lab';
+      if(g==='POND') return 'Pond';
+      if(g==='SHOP') return 'Shop';
+      return clean(g);
+    }
+    function normalizeLocationInfo(item){
+      const raw=cleanupLabelRaw([rawLabelSource(item),item.name,item.layer].filter(Boolean).join(' '));
+      let m;
+      if(!raw) return {title:'Location',short:'Loc',group:'Location',badge:'L',meta:displayProject(item.project)};
+      if((m=raw.match(/\b(?:CY|Can(?:\s*Yard)?)\s*#?\s*0?(\d{1,2})\s*[- ]?\s*([A-Z])?\b/i))) {
+        const num=fmtNum(m[1]), s=(m[2]||'').toUpperCase();
+        return {title:formatCode('CY',num,s),short:formatCode('CY',num,s),group:'CY'+num,badge:'CY',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\b(?:HT|High\s*Tunnels?)\s*#?\s*0?(\d{1,2})\s*[- ]?\s*([A-Z])?\b/i))) {
+        const num=fmtNum(m[1]), s=(m[2]||'').toUpperCase();
+        return {title:formatCode('HT',num,s),short:formatCode('HT',num,s),group:'HT'+num,badge:'HT',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\b(?:SH|Shade\s*House|Shadehouse)\s*#?\s*0?(\d{1,2})(?:\s*[- ]?\s*[A-Z])?\b/i))) {
+        const num=fmtNum(m[1]);
+        return {title:`SH #${num}`,short:`SH #${num}`,group:'SH'+num,badge:'SH',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\b(?:FB|Four\s*Bays?)\s*#?\s*0?(\d{1,2})\b/i))) {
+        const num=fmtNum(m[1]);
+        return {title:`FB #${num}`,short:`FB #${num}`,group:'FB'+num,badge:'FB',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\bZone\s*#?\s*0?(\d{1,2})\b/i))) {
+        const num=fmtNum(m[1]);
+        return {title:`Zone ${num}`,short:`ZN #${num}`,group:'ZONE'+num,badge:'ZN',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\bHead\s*House\s*#?\s*0?(\d{1,2})\b/i))) {
+        const num=fmtNum(m[1]);
+        return {title:`Head House ${num}`,short:`HH #${num}`,group:'HEADHOUSE'+num,badge:'HH',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\bBlock\s*#?\s*(\d+)\b/i))) {
+        const num=String(m[1]);
+        return {title:`Block ${num}`,short:`BLK ${num}`,group:'BLOCK'+num,badge:'BLK',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\b(?:CF|Cold\s*Frame)\s*#?\s*0?(\d{1,2})\b/i))) {
+        const num=fmtNum(m[1]);
+        return {title:`Cold Frame ${num}`,short:`CF #${num}`,group:'CF'+num,badge:'CF',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\b(?:MT|Maintenance\s*Trailer)\s*#?\s*0?(\d{1,2})\b/i))) {
+        const num=fmtNum(m[1]);
+        return {title:`Maintenance Trailer ${num}`,short:`MT #${num}`,group:'MT'+num,badge:'MT',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\b(?:SP|Solar\s*Panels?)\s*#?\s*0?(\d{1,2})\b/i))) {
+        const num=fmtNum(m[1]);
+        return {title:`Solar Panels ${num}`,short:`SP #${num}`,group:'SP'+num,badge:'SP',meta:displayProject(item.project)};
+      }
+      if((m=raw.match(/\b(?:SL|Sorting\s*Line)\s*#?\s*0?(\d{1,2})\b/i))) {
+        const num=fmtNum(m[1]);
+        return {title:`Sorting Line ${num}`,short:`SL #${num}`,group:'SL'+num,badge:'SL',meta:displayProject(item.project)};
+      }
+      if(/\bSoil\s*Bunker\b/i.test(raw)) return {title:'Soil Bunker',short:'Soil Bunker',group:'SOILBUNKER',badge:'SB',meta:displayProject(item.project)};
+      if(/\bWater\s*Treatment\b/i.test(raw)) return {title:'Water Treatment',short:'Water Treatment',group:'WATERTREATMENT',badge:'WT',meta:displayProject(item.project)};
+      if(/\bOffice\b/i.test(raw)) return {title:'Office',short:'Office',group:'OFFICE',badge:'OF',meta:displayProject(item.project)};
+      if(/\bLab\b/i.test(raw)) return {title:'Lab',short:'Lab',group:'LAB',badge:'LB',meta:displayProject(item.project)};
+      if(/\bPond\b/i.test(raw)) return {title:'Pond',short:'Pond',group:'POND',badge:'PD',meta:displayProject(item.project)};
+      if(/\bShop\b/i.test(raw)) return {title:'Shop',short:'Shop',group:'SHOP',badge:'SHP',meta:displayProject(item.project)};
+      const cleaned=clean(compressRepeatedPhrases(raw));
+      return {title:cleaned,short:cleaned,group:cleaned,badge:acronym(cleaned).slice(0,3)||'L',meta:displayProject(item.project)};
+    }
+    function labelText(item){const info=normalizeLocationInfo(item);return state.shortLabels?info.short:info.title}
+    function colorGroupKey(item){return normalizeLocationInfo(item).group}
     function colorIndexFrom(text){let h=2166136261;for(const ch of String(text||'')){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return Math.abs(h>>>0)%LOCATION_PALETTE.length}
-    function colorFor(item){const info=labelInfo(item);const groupKey=info.group||colorGroupKey(item);if(item.project==='Locations'||item.project==='Structures'||item.project==='Structures / Yards')return LOCATION_PALETTE[colorIndexFrom(groupKey)];const explicit=configFor(item.project).color;return explicit||LOCATION_PALETTE[colorIndexFrom(groupKey||item.project)]}
-    function badgeText(item){return labelInfo(item).badge}
-    function visibleMeta(item){const info=labelInfo(item);return info.meta && info.meta!==info.title ? info.meta : displayProject(item.project)}
+    function colorFor(item){const key=colorGroupKey(item);if(item.project==='Locations'||item.project==='Structures'||item.project==='Structures / Yards')return LOCATION_PALETTE[colorIndexFrom(key)];const explicit=configFor(item.project).color;return explicit||LOCATION_PALETTE[colorIndexFrom(key||item.project)]}
+    function badgeText(item){return normalizeLocationInfo(item).badge}
+    function visibleMeta(item){return normalizeLocationInfo(item).meta}
     function centerOf(f){try{const pt=turf.pointOnFeature(f);return[pt.geometry.coordinates[1],pt.geometry.coordinates[0]]}catch(e){const g=f.geometry;if(g&&g.type==='Point')return[g.coordinates[1],g.coordinates[0]];return null}}
     function areaOf(f){try{return turf.area(f)}catch(e){return 0}}
     function normalizeFeature(f,i){const p=f.properties||{};const project=projectOf(p),layer=sourceLayer(p),name=featName(p),center=centerOf(f),rawKey=p._feature_key||`${project}_${layer}_${p.OBJECTID||p.FID||i}`;const item={key:safeKey(rawKey)+'_'+i,project,layer,name,feature:f,center,groupKey:'',geom:f.geometry?.type||'Unknown',area:areaOf(f)};item.groupKey=colorGroupKey(item);return item}
@@ -136,16 +237,16 @@
     async function loadFirst(paths){let lastErr;for(const path of paths){try{return await loadJson(path)}catch(e){lastErr=e}}throw lastErr}
     async function init(){if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister())).catch(()=>{})}const polys=await loadFirst(['/data/combined_polygons.geojson','data/combined_polygons.geojson','/data/structures_polygons.geojson','data/structures_polygons.geojson']);try{const cfg=await loadFirst(['/data/map_config.json','data/map_config.json']);if(cfg.projects)state.config={...DEFAULT_PROJECTS,...cfg.projects}}catch(e){}state.items=(polys.features||[]).filter(f=>!isHardHiddenFeature(f)).map(normalizeFeature).filter(x=>x.center).filter(x=>!isHardHiddenItem(x));buildGroups();applyFilter();fitAll()}
     function buildGroups(){state.groups.clear();for(const item of state.items){if(!state.groups.has(item.project)){state.groups.set(item.project,{name:item.project,items:[],visible:visibleDefaultFor(item.project),labels:labelsDefaultFor(item.project),colorGroups:new Map()})}const g=state.groups.get(item.project);g.items.push(item);if(!g.colorGroups.has(item.groupKey))g.colorGroups.set(item.groupKey,0);g.colorGroups.set(item.groupKey,g.colorGroups.get(item.groupKey)+1)}}
-    function renderProjects(){let html='';for(const g of[...state.groups.values()].sort((a,b)=>displayProject(a.name).localeCompare(displayProject(b.name)))){const sample=g.items.find(i=>!isHardHiddenItem(i));if(!sample)continue;const shownCount=g.items.filter(i=>!isHardHiddenItem(i)&&!isStructureHidden(i)).length;html+=`<div class="project" data-project="${esc(g.name)}"><div class="phead"><span class="sw" style="background:${colorFor(sample)}"></span><div class="pname">${esc(displayProject(g.name))}</div><span class="badge">${shownCount}</span></div><div class="pactions"><button class="${g.visible?'on':''}" data-vis="${esc(g.name)}">Visible</button><button class="${g.labels?'on':''}" data-lab="${esc(g.name)}">Labels</button><button data-zoom="${esc(g.name)}">Zoom</button></div><div class="plist">${[...g.colorGroups.entries()].sort().map(([groupName,n])=>{const groupSample=g.items.find(x=>x.groupKey===groupName)||sample;return`<div class="layerrow"><span><i class="dot" style="background:${colorFor(groupSample)}"></i>${esc(clean(groupName))}</span><small>${n}</small></div>`}).join('')}</div></div>`}
+    function renderProjects(){let html='';for(const g of[...state.groups.values()].sort((a,b)=>displayProject(a.name).localeCompare(displayProject(b.name)))){const sample=g.items.find(i=>!isHardHiddenItem(i));if(!sample)continue;const shownCount=g.items.filter(i=>!isHardHiddenItem(i)&&!isStructureHidden(i)).length;html+=`<div class="project" data-project="${esc(g.name)}"><div class="phead"><span class="sw" style="background:${colorFor(sample)}"></span><div class="pname">${esc(displayProject(g.name))}</div><span class="badge">${shownCount}</span></div><div class="pactions"><button class="${g.visible?'on':''}" data-vis="${esc(g.name)}">Visible</button><button class="${g.labels?'on':''}" data-lab="${esc(g.name)}">Labels</button><button data-zoom="${esc(g.name)}">Zoom</button></div><div class="plist">${[...g.colorGroups.entries()].sort().map(([groupName,n])=>{const groupSample=g.items.find(x=>x.groupKey===groupName)||sample;return`<div class="layerrow"><span><i class="dot" style="background:${colorFor(groupSample)}"></i>${esc(formatGroupKey(groupName))}</span><small>${n}</small></div>`}).join('')}</div></div>`}
       $('projects').innerHTML=html;$('projects').querySelectorAll('[data-project]').forEach(el=>{el.querySelector('.phead').onclick=()=>el.classList.toggle('open')});$('projects').querySelectorAll('[data-vis]').forEach(b=>{b.onclick=e=>{e.stopPropagation();const g=state.groups.get(b.dataset.vis);g.visible=!g.visible;renderProjects();renderMap();renderLabels();renderStats()}});$('projects').querySelectorAll('[data-lab]').forEach(b=>{b.onclick=e=>{e.stopPropagation();const g=state.groups.get(b.dataset.lab);g.labels=!g.labels;renderProjects();renderLabels()}});$('projects').querySelectorAll('[data-zoom]').forEach(b=>{b.onclick=e=>{e.stopPropagation();zoomProject(b.dataset.zoom)}})}
     function renderList(){const rows=state.filtered.slice(0,1200).map(item=>{const showOn=!isStructureHidden(item),labelOn=!isLabelHidden(item);return`<div class="item" data-key="${esc(item.key)}" style="${showOn?'':'opacity:.50;'}"><div class="item-control"><label class="checkline" title="Show/hide this location"><input type="checkbox" data-show-item="${esc(item.key)}" ${showOn?'checked':''} onclick="event.stopPropagation();" style="accent-color:${colorFor(item)};">Show</label><label class="checkline" title="Show/hide this label"><input type="checkbox" data-label-item="${esc(item.key)}" ${labelOn?'checked':''} onclick="event.stopPropagation();" style="accent-color:${colorFor(item)};">Label</label></div><div class="ib" style="background:${colorFor(item)}">${esc(badgeText(item))}</div><div class="it"><b>${esc(labelText(item))}</b><small>${esc(visibleMeta(item))}</small></div></div>`}).join('');$('list').innerHTML=rows||'<div class="note">No results.</div>';$('list').querySelectorAll('[data-key]').forEach(r=>{r.onclick=e=>{if(e.target.matches('[data-show-item]')||e.target.matches('[data-label-item]'))return;const item=state.items.find(x=>x.key===r.dataset.key);if(!isStructureHidden(item))openItem(item)}});$('list').querySelectorAll('[data-show-item]').forEach(cb=>{cb.onchange=()=>{const key=cb.dataset.showItem;if(cb.checked)state.hiddenStructures.delete(key);else state.hiddenStructures.add(key);if(state.current&&state.current.key===key&&state.hiddenStructures.has(key)){$('drawer').classList.remove('open');state.current=null}renderList();renderProjects();renderMap();renderLabels();renderStats()}});$('list').querySelectorAll('[data-label-item]').forEach(cb=>{cb.onchange=()=>{const key=cb.dataset.labelItem;if(cb.checked)state.hiddenLabels.delete(key);else state.hiddenLabels.add(key);renderList();renderLabels();renderStats()}})}
-    function renderPills(){const groupMap=new Map();for(const item of state.items){if(isHardHiddenItem(item))continue;if(!groupMap.has(item.groupKey))groupMap.set(item.groupKey,item)}$('pillbar').innerHTML=[...groupMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([groupName,sample])=>{const count=state.items.filter(i=>i.groupKey===groupName&&!isStructureHidden(i)&&!isHardHiddenItem(i)).length;return`<span class="pill"><i class="dot" style="background:${colorFor(sample)}"></i>${esc(clean(groupName))} <small>${count}</small></span>`}).join('')}
+    function renderPills(){const groupMap=new Map();for(const item of state.items){if(isHardHiddenItem(item))continue;if(!groupMap.has(item.groupKey))groupMap.set(item.groupKey,item)}$('pillbar').innerHTML=[...groupMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([groupName,sample])=>{const count=state.items.filter(i=>i.groupKey===groupName&&!isStructureHidden(i)&&!isHardHiddenItem(i)).length;return`<span class="pill"><i class="dot" style="background:${colorFor(sample)}"></i>${esc(formatGroupKey(groupName))} <small>${count}</small></span>`}).join('')}
     function renderMap(){if(state.polys)map.removeLayer(state.polys);if(state.points)map.removeLayer(state.points);if(state.clusters)map.removeLayer(state.clusters);const visible=visibleStructureItems();const fc={type:'FeatureCollection',features:visible.map(i=>i.feature)};state.polys=L.geoJSON(fc,{style:f=>{const item=state.items.find(x=>x.feature===f)||normalizeFeature(f,0);return style(item,state.current?.key===item.key)},onEachFeature:(f,layer)=>{const item=state.items.find(x=>x.feature===f)||normalizeFeature(f,0);layer.on('click',()=>openItem(item));layer.bindPopup(`<b>${esc(labelText(item))}</b><div class="popup-grid"><b>Color Group</b><span>${esc(clean(colorGroupKey(item)))}</span><b>Source</b><span>${esc(clean(cleanupLabelRaw(item.layer)))}</span></div>`)}});if(state.showPolys)state.polys.addTo(map);const normal=L.layerGroup();const cluster=L.markerClusterGroup({disableClusteringAtZoom:19,spiderfyOnMaxZoom:true});for(const item of visible){const marker=L.circleMarker(item.center,{radius:7,color:'#fff',weight:2,fillColor:colorFor(item),fillOpacity:1});marker.on('click',()=>openItem(item));if(pointModeFor(item.project)==='cluster')cluster.addLayer(marker);else normal.addLayer(marker)}state.points=normal;state.clusters=cluster;if(state.showPoints){normal.addTo(map);cluster.addTo(map)}renderLabels();renderStats()}
     function renderLabels(){for(const m of state.labels)map.removeLayer(m);state.labels=[];const used=new Set();for(const item of visibleLabelItems()){const g=state.groups.get(item.project);if(!(state.allLabels||g.labels||state.current?.key===item.key))continue;const txt=labelText(item);if(!txt)continue;const key=item.key+'|'+txt;if(used.has(key))continue;used.add(key);let cls=item.area>3000?'label':'label small';if(item.area<800)cls='label tiny';const icon=L.divIcon({className:'',html:`<div class="${cls}">${esc(txt)}</div>`});const mk=L.marker(item.center,{icon,interactive:false,keyboard:false}).addTo(map);state.labels.push(mk)}}
     function renderStats(){const shown=visibleStructureItems().length;$('featureStat').textContent=`${state.items.length.toLocaleString()} features`;$('shownStat').textContent=`${shown.toLocaleString()} shown`;$('sub').textContent=`${shown.toLocaleString()} features loaded`;$('labelStat').textContent=state.allLabels?'all labels':'defaults'}
     function applyFilter(){const q=$('search').value.trim().toLowerCase();state.filtered=state.items.filter(i=>{if(isHardHiddenItem(i))return false;if(!q)return true;return[displayProject(i.project),i.layer,i.name,labelText(i),colorGroupKey(i)].join(' ').toLowerCase().includes(q)});renderProjects();renderList();renderMap();renderPills();showSuggestions()}
     function showSuggestions(){const q=$('search').value.trim().toLowerCase();const box=$('suggest');if(!q){box.classList.remove('show');return}const matches=state.items.filter(i=>!isHardHiddenItem(i)).filter(i=>!isStructureHidden(i)).filter(i=>[displayProject(i.project),i.layer,i.name,labelText(i),colorGroupKey(i)].join(' ').toLowerCase().includes(q)).slice(0,8);box.innerHTML=matches.map(i=>`<div class="sug" data-key="${esc(i.key)}">${esc(labelText(i))}<small>${esc(clean(colorGroupKey(i)))}</small></div>`).join('');box.classList.toggle('show',matches.length>0);box.querySelectorAll('[data-key]').forEach(r=>{r.onclick=()=>{const it=state.items.find(x=>x.key===r.dataset.key);$('suggest').classList.remove('show');if(!isStructureHidden(it))openItem(it)}})}
-    function openItem(item){if(!item||isHardHiddenItem(item)||isStructureHidden(item))return;state.current=item;$('drawer').classList.add('open');$('dTitle').textContent=labelText(item);$('dSub').textContent=clean(colorGroupKey(item));$('dDetails').innerHTML=`<b>Color Group</b><span>${esc(clean(colorGroupKey(item)))}</span><b>Source</b><span>${esc(clean(cleanupLabelRaw(item.layer)))}</span><b>Geometry</b><span>${esc(item.geom)}</span><b>Area</b><span>${item.area?((item.area*0.000247105).toFixed(2)+' ac'):'—'}</span><b>Coords</b><span>${item.center[0].toFixed(6)}, ${item.center[1].toFixed(6)}</span>`;map.flyTo(item.center,Math.max(map.getZoom(),18),{duration:.5});if(state.polys){state.polys.setStyle(f=>style(state.items.find(x=>x.feature===f)||normalizeFeature(f,0),state.current?.feature===f))}renderLabels()}
+    function openItem(item){if(!item||isHardHiddenItem(item)||isStructureHidden(item))return;state.current=item;$('drawer').classList.add('open');$('dTitle').textContent=labelText(item);$('dSub').textContent=formatGroupKey(colorGroupKey(item));$('dDetails').innerHTML=`<b>Color Group</b><span>${esc(clean(colorGroupKey(item)))}</span><b>Source</b><span>${esc(clean(cleanupLabelRaw(item.layer)))}</span><b>Geometry</b><span>${esc(item.geom)}</span><b>Area</b><span>${item.area?((item.area*0.000247105).toFixed(2)+' ac'):'—'}</span><b>Coords</b><span>${item.center[0].toFixed(6)}, ${item.center[1].toFixed(6)}</span>`;map.flyTo(item.center,Math.max(map.getZoom(),18),{duration:.5});if(state.polys){state.polys.setStyle(f=>style(state.items.find(x=>x.feature===f)||normalizeFeature(f,0),state.current?.feature===f))}renderLabels()}
     function zoomProject(name){const items=state.items.filter(i=>i.project===name&&!isStructureHidden(i)&&!isHardHiddenItem(i));const b=L.geoJSON({type:'FeatureCollection',features:items.map(i=>i.feature)}).getBounds();if(b.isValid())map.fitBounds(b.pad(.14))}
     function fitAll(){const b=L.geoJSON({type:'FeatureCollection',features:visibleStructureItems().map(i=>i.feature)}).getBounds();if(b.isValid())map.fitBounds(b.pad(.12))}
     function setBase(which){state.base=which;if(which==='street'){map.removeLayer(sat);street.addTo(map)}else{map.removeLayer(street);sat.addTo(map)}$('satBtn').classList.toggle('on',which==='sat');$('streetBtn').classList.toggle('on',which==='street')}
