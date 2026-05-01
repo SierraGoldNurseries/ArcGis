@@ -20,34 +20,51 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Check out repository
+      - name: Check out repository with Git LFS files
         uses: actions/checkout@v4
         with:
-          lfs: false
+          lfs: true
           ref: ${{ github.event.client_payload.branch || github.ref }}
 
-      - name: Install GIS libraries
+      - name: Pull Git LFS files
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3 python3-pip python3-venv p7zip-full gdal-bin
+          set -euo pipefail
+          git lfs install
+          git lfs pull
 
-      - name: Ignore Git LFS pointer packages
+      - name: Show raw files
+        run: |
+          set -euo pipefail
+          echo "Raw files after LFS pull:"
+          find data/raw -maxdepth 2 -type f -print -exec ls -lh {} \;
+
+      - name: Verify raw packages are real files
         run: |
           set -euo pipefail
 
-          skipped=0
+          bad=0
 
           for f in data/raw/*.ppkx data/raw/*.mpkx; do
             [ -e "$f" ] || continue
 
             if head -c 300 "$f" | grep -q "git-lfs.github.com/spec"; then
-              echo "Warning: $f is only a Git LFS pointer. Skipping it."
-              rm -f "$f"
-              skipped=$((skipped + 1))
+              echo "ERROR: $f is still only a Git LFS pointer, not the real package."
+              bad=1
+            else
+              echo "OK real file: $f"
+              ls -lh "$f"
             fi
           done
 
-          echo "Skipped $skipped Git LFS pointer package(s)."
+          if [ "$bad" -eq 1 ]; then
+            echo "Git LFS did not download the real files."
+            exit 1
+          fi
+
+      - name: Install GIS libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip python3-venv p7zip-full gdal-bin
 
       - name: Build map data
         run: |
@@ -58,8 +75,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Checking required generated files..."
-
           test -f data/structures_polygons.geojson
           test -f data/structures_points.geojson
           test -f data/combined_polygons.geojson
@@ -68,7 +83,7 @@ jobs:
           test -f data/map_config.json
           test -f data/project_manifest.json
 
-          echo "Generated files found:"
+          echo "Generated files:"
           ls -lh data/structures_polygons.geojson
           ls -lh data/structures_points.geojson
           ls -lh data/combined_polygons.geojson
@@ -84,7 +99,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          # Force-add generated files in case .gitignore is blocking GeoJSON/CSV/JSON.
           git add -A data
           git add -f data/*.geojson data/*.csv data/*.json || true
           git add -f data/layers/*.geojson || true
