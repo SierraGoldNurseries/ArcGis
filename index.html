@@ -1,73 +1,848 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<meta name="theme-color" content="#0f766e" />
-<title>SGN Map App</title>
-<link rel="manifest" href="manifest.json" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-<style>
-:root{--ink:#0f172a;--muted:#64748b;--line:#dbe4ee;--card:#fff;--brand:#0f766e;--blue:#0284c7;--shadow:0 18px 48px rgba(15,23,42,.18);--radius:22px;--tap:46px}*{box-sizing:border-box}html,body,#map{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:var(--ink)}body{overflow:hidden;background:#edf4f8}#map{position:absolute;inset:0}.glass{background:rgba(255,255,255,.94);backdrop-filter:blur(16px);border:1px solid rgba(219,228,238,.95);box-shadow:var(--shadow)}button,a,input{font:inherit}.appbar{position:absolute;z-index:1200;left:12px;right:12px;top:10px;min-height:64px;border-radius:24px;display:flex;align-items:center;gap:10px;padding:9px 12px}.logo{width:44px;height:44px;border-radius:16px;background:linear-gradient(135deg,var(--brand),var(--blue));display:grid;place-items:center;color:#fff;font-weight:1000}.title{min-width:0}.title h1{font-size:17px;margin:0;line-height:1.05}.title small{color:var(--muted);font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}.spacer{flex:1}.btn,.iconbtn{min-height:var(--tap);border:1px solid var(--line);background:#fff;border-radius:16px;padding:0 12px;font-weight:950;cursor:pointer;text-decoration:none;color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}.iconbtn{width:46px;padding:0;font-size:20px}.primary{background:linear-gradient(135deg,var(--brand),#0d9488);color:#fff;border-color:transparent}.side{position:absolute;z-index:1100;left:12px;top:86px;width:392px;max-width:calc(100vw - 24px);max-height:calc(100vh - 104px);border-radius:26px;padding:12px;overflow:auto;transition:transform .24s ease,opacity .24s ease}.side.collapsed{transform:translateX(calc(-100% - 18px));opacity:0;pointer-events:none}.openSide{position:absolute;z-index:1100;left:12px;top:86px;display:none}.side.collapsed+.openSide{display:inline-flex}.search{width:100%;height:46px;border:1px solid var(--line);border-radius:17px;padding:0 13px;font-weight:850;outline:none}.search:focus{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.16)}.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.quick button,.quick a{min-height:42px;border:1px solid var(--line);background:#fff;border-radius:15px;font-weight:950;cursor:pointer;text-decoration:none;color:var(--ink);display:flex;align-items:center;justify-content:center}.quick .on{background:#ecfeff;border-color:#67e8f9;color:#155e75}.stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.stat{font-size:11px;font-weight:950;border:1px solid var(--line);border-radius:999px;background:#f8fafc;padding:6px 9px}.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-top:12px}.tab{min-height:40px;border:1px solid var(--line);background:#fff;border-radius:14px;font-weight:950;cursor:pointer}.tab.on{background:#ecfeff;color:#155e75}.pane{display:none;padding-top:10px}.pane.on{display:block}.project{border:1px solid #eaf0f7;border-radius:18px;background:#fff;margin-bottom:10px;overflow:hidden}.phead{display:flex;align-items:center;gap:8px;padding:10px}.sw{width:16px;height:16px;border-radius:6px;border:1px solid #0002;flex:none}.pname{font-size:13px;font-weight:1000;min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{border-radius:999px;background:#eef2ff;border:1px solid #c7d2fe;padding:4px 8px;font-size:11px;font-weight:1000;white-space:nowrap}.pactions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:0 10px 10px}.pactions button{min-height:35px;border:1px solid var(--line);border-radius:13px;background:#fff;font-weight:950;cursor:pointer;font-size:12px}.pactions button.on{background:#ecfeff;color:#155e75;border-color:#67e8f9}.plist{padding:0 10px 10px;display:none}.project.open .plist{display:block}.layerrow{display:flex;align-items:center;gap:8px;border-top:1px solid #f1f5f9;padding:8px 0;font-size:12px}.layerrow span{font-weight:900;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.item{display:flex;gap:9px;align-items:center;padding:9px 4px;border-bottom:1px solid #f1f5f9;cursor:pointer}.item:hover{background:#f8fafc}.ib{width:35px;height:35px;border-radius:13px;color:#fff;display:grid;place-items:center;font-weight:1000;font-size:12px;flex:none}.it{min-width:0;flex:1}.it b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.it small{color:var(--muted);font-weight:850}.drawer{position:absolute;z-index:1150;right:12px;top:86px;bottom:14px;width:380px;max-width:calc(100vw - 24px);border-radius:26px;padding:14px;transform:translateX(calc(100% + 24px));transition:.24s;display:flex;flex-direction:column;overflow:auto}.drawer.open{transform:translateX(0)}.drawer h2{margin:0 0 4px;font-size:20px}.drawer p{margin:0 0 10px;color:var(--muted);font-weight:850}.details{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:17px;padding:12px;background:#fff}.details b{color:#475569}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.actions .wide{grid-column:1/-1}.label{font-weight:1000;white-space:nowrap;color:#0f172a;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;pointer-events:none;transform:translate(-50%,-50%)}.label.small{font-size:11px}.label.tiny{font-size:9px}.toast{position:absolute;z-index:1600;right:12px;top:86px;background:#111827;color:white;padding:10px 13px;border-radius:16px;font-weight:950;display:none;max-width:360px}.toast.show{display:block}.pillbar{position:absolute;z-index:1000;right:12px;bottom:16px;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:min(760px,calc(100vw - 24px))}.pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:999px;padding:6px 9px;font-size:11px;font-weight:1000;box-shadow:0 8px 22px rgba(15,23,42,.10)}.dot{width:9px;height:9px;border-radius:99px}.note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:10px}.hidden{display:none!important}.suggest{position:absolute;z-index:1500;left:12px;top:144px;width:392px;max-width:calc(100vw - 24px);border-radius:18px;overflow:hidden;display:none}.suggest.show{display:block}.sug{background:#fff;border-bottom:1px solid #f1f5f9;padding:10px 12px;font-weight:950;cursor:pointer}.sug small{display:block;color:var(--muted);font-weight:800;margin-top:2px}.sug:hover{background:#f8fafc}.locdot{width:16px;height:16px;border-radius:99px;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 8px rgba(37,99,235,.20)}@media(max-width:860px){.appbar{left:8px;right:8px;top:8px}.title small{display:none}.btn.hide-mobile{display:none}.side{left:8px;top:80px;width:min(380px,calc(100vw - 16px));max-height:calc(100vh - 94px)}.openSide{left:8px;top:80px}.drawer{left:8px;right:8px;top:auto;bottom:8px;width:auto;height:min(68vh,560px);transform:translateY(calc(100% + 20px))}.drawer.open{transform:translateY(0)}.quick{grid-template-columns:repeat(2,1fr)}.pillbar{display:none}.suggest{left:8px;top:138px;width:min(380px,calc(100vw - 16px))}.logo{width:40px;height:40px}.appbar{min-height:58px}}
-</style>
-</head>
-<body>
-<div id="map"></div>
-<header class="appbar glass"><button class="iconbtn" id="panelToggle">☰</button><div class="logo">SGN</div><div class="title"><h1>SGN Map App</h1><small id="sub">Loading map data...</small></div><div class="spacer"></div><a class="btn primary" href="import.html">Admin / Import</a><button class="btn hide-mobile" id="fitBtn">Fit Map</button></header>
-<section class="side glass collapsed" id="side"><input class="search" id="search" placeholder="Search project, layer, structure, block..."/><div class="quick"><button class="on" id="satBtn">Satellite</button><button id="streetBtn">Street</button><button class="on" id="polyBtn">Polygons</button><button class="on" id="pointBtn">Points</button><button id="allLabelsBtn">All labels</button><button id="shortBtn">Short labels</button></div><div class="stats"><span class="stat" id="featureStat">0 features</span><span class="stat" id="shownStat">0 shown</span><span class="stat" id="labelStat">defaults</span></div><div class="tabs"><button class="tab on" data-tab="projects">Projects</button><button class="tab" data-tab="list">List</button><button class="tab" data-tab="tools">Tools</button></div><div class="pane on" id="projects"></div><div class="pane" id="list"></div><div class="pane" id="tools"><div class="quick"><button id="gpsBtn">Find Me</button><button id="copyBtn">Copy View</button><button id="clearBtn">Clear</button><a class="btn" href="import.html">Import</a></div><div class="note">Labels are de-duplicated. Structures/Yards, Chemical, Owl Boxes, and Blocks label by default. Irrigation, Trees, and Prune layers stay label-off unless selected or changed.</div></div></section><button class="btn openSide" id="openSide">Open Layers</button><div class="suggest glass" id="suggest"></div>
-<aside class="drawer glass" id="drawer"><button class="iconbtn" id="closeDrawer" style="align-self:flex-end">×</button><h2 id="dTitle">No feature selected</h2><p id="dSub">Tap a polygon or point.</p><div class="details" id="dDetails"></div><div class="actions"><button id="zoomBtn">Zoom</button><button id="gmapBtn">Google Maps</button><button id="amapBtn">Apple Maps</button><button id="coordBtn">Copy coords</button><a class="btn wide primary" href="import.html">Admin / Import project files</a></div></aside>
-<div class="pillbar" id="pillbar"></div><div class="toast" id="toast"></div>
 <script>
-const $=id=>document.getElementById(id);
-const DEFAULT_PROJECTS={
- 'Structures / Yards':{labelsDefault:true,visibleDefault:true,opacity:.26,pointMode:'normal',color:'#0f766e'},
- 'Chemical Locations':{labelsDefault:true,visibleDefault:true,opacity:.34,pointMode:'normal',color:'#dc2626'},
- 'Irrigation':{labelsDefault:false,visibleDefault:true,opacity:.30,pointMode:'normal',color:'#0284c7'},
- 'Owl Boxes':{labelsDefault:true,visibleDefault:true,opacity:.30,pointMode:'normal',color:'#7c3aed'},
- 'Trees':{labelsDefault:false,visibleDefault:true,opacity:.18,pointMode:'cluster',color:'#16a34a'},
- 'Prune North':{labelsDefault:false,visibleDefault:true,opacity:.22,pointMode:'filtered',color:'#ea580c'},
- 'Prune South':{labelsDefault:false,visibleDefault:true,opacity:.22,pointMode:'filtered',color:'#f97316'},
- 'Block #23':{labelsDefault:true,visibleDefault:true,opacity:.12,pointMode:'normal',color:'#64748b'},
- 'Block #25':{labelsDefault:true,visibleDefault:true,opacity:.12,pointMode:'normal',color:'#475569'}
+const $ = id => document.getElementById(id);
+
+const DEFAULT_PROJECTS = {
+  'Structures / Yards': { labelsDefault: true, visibleDefault: true, opacity: .26, pointMode: 'normal', color: '#0f766e' },
+  'Chemical Locations': { labelsDefault: true, visibleDefault: true, opacity: .34, pointMode: 'normal', color: '#dc2626' },
+  'Irrigation': { labelsDefault: false, visibleDefault: true, opacity: .30, pointMode: 'normal', color: '#0284c7' },
+  'Owl Boxes': { labelsDefault: true, visibleDefault: true, opacity: .30, pointMode: 'normal', color: '#7c3aed' },
+  'Prune North': { labelsDefault: false, visibleDefault: true, opacity: .22, pointMode: 'normal', color: '#ea580c' },
+  'Prune South': { labelsDefault: false, visibleDefault: true, opacity: .22, pointMode: 'normal', color: '#f97316' },
+  'Block #23': { labelsDefault: true, visibleDefault: true, opacity: .12, pointMode: 'normal', color: '#64748b' },
+  'Block #25': { labelsDefault: true, visibleDefault: true, opacity: .12, pointMode: 'normal', color: '#475569' }
 };
-const state={items:[],filtered:[],groups:new Map(),config:DEFAULT_PROJECTS,current:null,showPolys:true,showPoints:true,allLabels:false,shortLabels:false,base:'sat',polys:null,points:null,clusters:null,labels:[],userMarker:null};
-function toast(t){$('toast').textContent=t;$('toast').classList.add('show');clearTimeout($('toast')._t);$('toast')._t=setTimeout(()=>$('toast').classList.remove('show'),2600)}
-function safe(v){return v==null||v===''?'—':String(v)}
-function clean(s){return String(s||'').replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase())}
-function projectOf(p){return p._project||p.project||'Structures / Yards'}
-function sourceLayer(p){return p._layer||p.layer||p.Name||p.name||'Layer'}
-function featName(p){return p.Name||p.name||p.Name_1||p.Label||p.label||p._layer||p.OBJECTID||p.FID||'Feature'}
-function acronym(s){return String(s||'').split(/[ _-]+/).filter(Boolean).map(x=>x[0]).join('').slice(0,3).toUpperCase()||'SG'}
-function groupKeyFor(project,layer,name){let t=String(layer||name||'').replace(/\s+/g,'_');let m;if((m=t.match(/^High_Tunnels?_(\d+)/i)))return `${project}|High_Tunnels_${m[1]}`;if((m=t.match(/^Shade_?House_(\d+)/i))|| (m=t.match(/^Shadehouse_(\d+)/i)))return `${project}|Shade_House_${m[1]}`;if((m=t.match(/^Can_Yard_(\d+)/i)))return `${project}|Can_Yard_${m[1]}`;if((m=t.match(/^Four_?Bays?_(\d*)/i)))return `${project}|Four_Bays`;if((m=t.match(/^Cold_Frame_(\d+)/i)))return `${project}|Cold_Frame`;if((m=t.match(/^Block[_ #]*(\d+)/i)))return `${project}|Block_${m[1]}`;return `${project}|${t.replace(/_[A-Z]$/,'')}`}
-function colorFor(item){const explicit=state.config[item.project]?.color;if(item.project==='Structures / Yards'){const palette=['#0f766e','#0284c7','#7c3aed','#b45309','#dc2626','#0891b2','#4f46e5','#be185d','#15803d','#9333ea','#475569'];let h=0;for(const ch of item.groupKey)h=((h<<5)-h+ch.charCodeAt(0))>>>0;return palette[h%palette.length]}return explicit||'#0f766e'}
-function labelText(item){let layer=item.layer;let m;if((m=layer.match(/^Four_?Bays?_(\d+)/i)))return 'FB'+String(m[1]).padStart(2,'0');if((m=layer.match(/^Can_Yard_(\d+)_?([A-Z])?/i)))return 'CY'+String(m[1]).padStart(2,'0')+(m[2]||'');if((m=layer.match(/^High_Tunnels?_(\d+)_?([A-Z])?/i)))return 'HT'+String(m[1]).padStart(2,'0')+(m[2]||'');if((m=layer.match(/^Shade_?House_(\d+)_?([A-Z])?/i))||(m=layer.match(/^Shadehouse_(\d+)_?([A-Z])?/i)))return 'SH'+String(m[1]).padStart(2,'0')+(m[2]||'');if((m=layer.match(/^Cold_Frame_(\d+)/i)))return 'CF'+String(m[1]).padStart(2,'0');if((m=layer.match(/^Block[_ #]*(\d+)/i)))return 'Block '+m[1];return state.shortLabels?acronym(layer):clean(layer)}
-function centerOf(f){try{const pt=turf.pointOnFeature(f);return [pt.geometry.coordinates[1],pt.geometry.coordinates[0]]}catch(e){const g=f.geometry;if(g&&g.type==='Point')return [g.coordinates[1],g.coordinates[0]];return null}}
-function areaOf(f){try{return turf.area(f)}catch(e){return 0}}
-function normalizeFeature(f,i){const p=f.properties||{};const project=projectOf(p);const layer=sourceLayer(p);const name=featName(p);const center=centerOf(f);const groupKey=groupKeyFor(project,layer,name);return {key:p._feature_key||`${project}|${layer}|${p.OBJECTID||p.FID||i}`,project,layer,name,feature:f,center,groupKey,geom:f.geometry?.type||'Unknown',area:areaOf(f)}}
-const map=L.map('map',{preferCanvas:true}).setView([36.78,-119.42],16);
-const street=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22,crossOrigin:true,attribution:'&copy; OpenStreetMap'});
-const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:19,maxZoom:22,crossOrigin:true,attribution:'Tiles &copy; Esri'}).addTo(map);
-function style(item,sel=false){let c=colorFor(item),cfg=state.config[item.project]||{};let fillOpacity=cfg.opacity ?? .25;if(item.project.startsWith('Block'))fillOpacity=.11;return {color:c,weight:sel?4:2,fillColor:c,fillOpacity};}
-function loadJson(path){return fetch(path+'?ts='+Date.now(),{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error(path+' '+r.status);const txt=await r.text();try{return JSON.parse(txt)}catch(e){throw new Error(path+' returned non-JSON')}})}
-async function init(){let polys;try{polys=await loadJson('data/combined_polygons.geojson')}catch(e){polys=await loadJson('data/structures_polygons.geojson')}try{const cfg=await loadJson('data/map_config.json');if(cfg.projects)state.config={...DEFAULT_PROJECTS,...cfg.projects}}catch(e){}state.items=(polys.features||[]).map(normalizeFeature).filter(x=>x.center);buildGroups();applyFilter();$('sub').textContent=`${state.items.length.toLocaleString()} features loaded`;fitAll();}
-function buildGroups(){state.groups.clear();for(const item of state.items){if(!state.groups.has(item.project))state.groups.set(item.project,{name:item.project,items:[],visible:state.config[item.project]?.visibleDefault!==false,labels:!!state.config[item.project]?.labelsDefault,layers:new Map()});let g=state.groups.get(item.project);g.items.push(item);if(!g.layers.has(item.layer))g.layers.set(item.layer,0);g.layers.set(item.layer,g.layers.get(item.layer)+1)}}
-function renderProjects(){let html='';for(const g of [...state.groups.values()].sort((a,b)=>a.name.localeCompare(b.name))){const c=state.config[g.name]?.color || colorFor(g.items[0]);html+=`<div class="project" data-project="${g.name}"><div class="phead"><span class="sw" style="background:${c}"></span><div class="pname">${g.name}</div><span class="badge">${g.items.length}</span></div><div class="pactions"><button class="${g.visible?'on':''}" data-vis="${g.name}">Visible</button><button class="${g.labels?'on':''}" data-lab="${g.name}">Labels</button><button data-zoom="${g.name}">Zoom</button></div><div class="plist">${[...g.layers.entries()].sort().map(([l,n])=>`<div class="layerrow"><span>${clean(l)}</span><small>${n}</small></div>`).join('')}</div></div>`} $('projects').innerHTML=html;$('projects').querySelectorAll('[data-project]').forEach(el=>el.querySelector('.phead').onclick=()=>el.classList.toggle('open'));$('projects').querySelectorAll('[data-vis]').forEach(b=>b.onclick=e=>{e.stopPropagation();const g=state.groups.get(b.dataset.vis);g.visible=!g.visible;applyFilter();});$('projects').querySelectorAll('[data-lab]').forEach(b=>b.onclick=e=>{e.stopPropagation();const g=state.groups.get(b.dataset.lab);g.labels=!g.labels;renderLabels();renderProjects();});$('projects').querySelectorAll('[data-zoom]').forEach(b=>b.onclick=e=>{e.stopPropagation();zoomProject(b.dataset.zoom);});}
-function renderList(){const rows=state.filtered.slice(0,600).map(item=>`<div class="item" data-key="${item.key}"><div class="ib" style="background:${colorFor(item)}">${acronym(item.project)}</div><div class="it"><b>${clean(item.name)}</b><small>${item.project} • ${clean(item.layer)}</small></div></div>`).join('');$('list').innerHTML=rows||'<div class="note">No results.</div>';$('list').querySelectorAll('[data-key]').forEach(r=>r.onclick=()=>openItem(state.items.find(x=>x.key===r.dataset.key)));}
-function renderPills(){$('pillbar').innerHTML=[...state.groups.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(g=>{const c=state.config[g.name]?.color || colorFor(g.items[0]);return `<span class="pill"><i class="dot" style="background:${c}"></i>${g.name} <small>${g.items.length}</small></span>`}).join('')}
-function renderMap(){if(state.polys)map.removeLayer(state.polys);if(state.points)map.removeLayer(state.points);if(state.clusters)map.removeLayer(state.clusters);const visible=state.filtered.filter(i=>state.groups.get(i.project)?.visible);const fc={type:'FeatureCollection',features:visible.map(i=>i.feature)};state.polys=L.geoJSON(fc,{style:f=>{const item=state.items.find(x=>x.feature===f)||normalizeFeature(f,0);return style(item,state.current?.key===item.key)},onEachFeature:(f,layer)=>{const item=state.items.find(x=>x.feature===f)||normalizeFeature(f,0);layer.on('click',()=>openItem(item));layer.bindPopup(`<b>${clean(item.name)}</b><div class="popup-grid"><b>Project</b><span>${item.project}</span><b>Layer</b><span>${clean(item.layer)}</span></div>`);}});if(state.showPolys)state.polys.addTo(map);const normal=L.layerGroup();const cluster=L.markerClusterGroup({disableClusteringAtZoom:19,spiderfyOnMaxZoom:true});for(const item of visible){const marker=L.circleMarker(item.center,{radius:7,color:'#fff',weight:2,fillColor:colorFor(item),fillOpacity:1});marker.on('click',()=>openItem(item));if((state.config[item.project]?.pointMode)==='cluster')cluster.addLayer(marker);else normal.addLayer(marker)}state.points=normal;state.clusters=cluster;if(state.showPoints){normal.addTo(map);cluster.addTo(map)}renderLabels();$('shownStat').textContent=`${visible.length.toLocaleString()} shown`;}
-function renderLabels(){for(const m of state.labels)map.removeLayer(m);state.labels=[];const used=new Set();for(const item of state.filtered){const g=state.groups.get(item.project);if(!g?.visible)continue;if(!(state.allLabels||g.labels||state.current?.key===item.key))continue;const txt=labelText(item);const key=item.project+'|'+txt+'|'+Math.round(item.center[0]*100000)+'|'+Math.round(item.center[1]*100000);if(used.has(key))continue;used.add(key);let cls=item.area>3000?'label':'label small';if(item.area<800)cls='label tiny';let icon=L.divIcon({className:'',html:`<div class="${cls}">${txt}</div>`});let mk=L.marker(item.center,{icon,interactive:false,keyboard:false}).addTo(map);state.labels.push(mk)}}
-function applyFilter(){const q=$('search').value.trim().toLowerCase();state.filtered=state.items.filter(i=>!q||[i.project,i.layer,i.name,labelText(i)].join(' ').toLowerCase().includes(q));renderProjects();renderList();renderMap();renderPills();$('featureStat').textContent=`${state.items.length.toLocaleString()} features`;showSuggestions();}
-function showSuggestions(){const q=$('search').value.trim().toLowerCase(),box=$('suggest');if(!q){box.classList.remove('show');return}const matches=state.items.filter(i=>[i.project,i.layer,i.name,labelText(i)].join(' ').toLowerCase().includes(q)).slice(0,8);box.innerHTML=matches.map(i=>`<div class="sug" data-key="${i.key}">${clean(i.name)}<small>${i.project} • ${clean(i.layer)}</small></div>`).join('');box.classList.toggle('show',matches.length>0);box.querySelectorAll('[data-key]').forEach(r=>r.onclick=()=>{const it=state.items.find(x=>x.key===r.dataset.key);$('suggest').classList.remove('show');openItem(it);});}
-function openItem(item){if(!item)return;state.current=item;$('drawer').classList.add('open');$('dTitle').textContent=clean(item.name);$('dSub').textContent=`${item.project} • ${clean(item.layer)}`;$('dDetails').innerHTML=`<b>Project</b><span>${item.project}</span><b>Layer</b><span>${clean(item.layer)}</span><b>Geometry</b><span>${item.geom}</span><b>Area</b><span>${item.area?((item.area*0.000247105).toFixed(2)+' ac'):'—'}</span><b>Coords</b><span>${item.center[0].toFixed(6)}, ${item.center[1].toFixed(6)}</span><b>Color group</b><span>${clean(item.groupKey.split('|')[1])}</span>`;map.flyTo(item.center,Math.max(map.getZoom(),18),{duration:.5});if(state.polys)state.polys.setStyle(f=>style(state.items.find(x=>x.feature===f)||normalizeFeature(f,0), state.current?.feature===f));renderLabels();}
-function zoomProject(name){const items=state.items.filter(i=>i.project===name);const b=L.geoJSON({type:'FeatureCollection',features:items.map(i=>i.feature)}).getBounds();if(b.isValid())map.fitBounds(b.pad(.14));}
-function fitAll(){const b=L.geoJSON({type:'FeatureCollection',features:state.filtered.map(i=>i.feature)}).getBounds();if(b.isValid())map.fitBounds(b.pad(.12));}
-function setBase(which){state.base=which;if(which==='street'){map.removeLayer(sat);street.addTo(map)}else{map.removeLayer(street);sat.addTo(map)}$('satBtn').classList.toggle('on',which==='sat');$('streetBtn').classList.toggle('on',which==='street')}
-$('panelToggle').onclick=()=>$('side').classList.toggle('collapsed');$('openSide').onclick=()=>$('side').classList.remove('collapsed');$('fitBtn').onclick=fitAll;$('search').oninput=applyFilter;$('search').onfocus=showSuggestions;$('satBtn').onclick=()=>setBase('sat');$('streetBtn').onclick=()=>setBase('street');$('polyBtn').onclick=()=>{state.showPolys=!state.showPolys;$('polyBtn').classList.toggle('on',state.showPolys);renderMap()};$('pointBtn').onclick=()=>{state.showPoints=!state.showPoints;$('pointBtn').classList.toggle('on',state.showPoints);renderMap()};$('allLabelsBtn').onclick=()=>{state.allLabels=!state.allLabels;$('allLabelsBtn').classList.toggle('on',state.allLabels);$('labelStat').textContent=state.allLabels?'all labels':'defaults';renderLabels()};$('shortBtn').onclick=()=>{state.shortLabels=!state.shortLabels;$('shortBtn').classList.toggle('on',state.shortLabels);renderLabels();renderList()};$('closeDrawer').onclick=()=>$('drawer').classList.remove('open');$('zoomBtn').onclick=()=>{if(state.current)map.setView(state.current.center,20)};$('gmapBtn').onclick=()=>{if(state.current)open(`https://www.google.com/maps?q=${state.current.center[0]},${state.current.center[1]}`,'_blank')};$('amapBtn').onclick=()=>{if(state.current)open(`https://maps.apple.com/?ll=${state.current.center[0]},${state.current.center[1]}`,'_blank')};$('coordBtn').onclick=async()=>{if(state.current){await navigator.clipboard.writeText(`${state.current.center[0].toFixed(6)}, ${state.current.center[1].toFixed(6)}`);toast('Coordinates copied')}};$('clearBtn').onclick=()=>{$('search').value='';applyFilter()};$('copyBtn').onclick=async()=>{const c=map.getCenter();await navigator.clipboard.writeText(`${location.origin}${location.pathname}#${map.getZoom()}/${c.lat.toFixed(6)}/${c.lng.toFixed(6)}`);toast('Map view copied')};$('gpsBtn').onclick=()=>{if(!navigator.geolocation)return toast('GPS not available');navigator.geolocation.getCurrentPosition(p=>{const ll=[p.coords.latitude,p.coords.longitude];if(state.userMarker)map.removeLayer(state.userMarker);state.userMarker=L.marker(ll,{icon:L.divIcon({className:'',html:'<div class="locdot"></div>'})}).addTo(map);map.setView(ll,18)},()=>toast('Unable to get GPS'))};document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.tab).classList.add('on')});document.addEventListener('click',e=>{if(!e.target.closest('#suggest')&&!e.target.closest('#search'))$('suggest').classList.remove('show')});if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});init().catch(e=>{console.error(e);$('sub').textContent='Map data failed to load';toast(e.message)});
+
+const HARD_HIDE_LABELS = [
+  'Solar Panels 02',
+  'Solar Panels 03',
+  'Water Treatment',
+  'Office',
+  'Lab'
+];
+
+const state = {
+  items: [],
+  filtered: [],
+  groups: new Map(),
+  config: DEFAULT_PROJECTS,
+  current: null,
+  showPolys: true,
+  showPoints: true,
+  allLabels: false,
+  shortLabels: false,
+  base: 'sat',
+  polys: null,
+  points: null,
+  clusters: null,
+  labels: [],
+  userMarker: null
+};
+
+function toast(t) {
+  $('toast').textContent = t;
+  $('toast').classList.add('show');
+  clearTimeout($('toast')._t);
+  $('toast')._t = setTimeout(() => $('toast').classList.remove('show'), 2600);
+}
+
+function safe(v) {
+  return v == null || v === '' ? '—' : String(v);
+}
+
+function clean(s) {
+  return String(s || '')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, m => m.toUpperCase());
+}
+
+function norm(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/[^a-z0-9#]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function projectOf(p) {
+  return p._project || p.project || 'Structures / Yards';
+}
+
+function sourceLayer(p) {
+  return p._layer || p.layer || p.Layer || p.Name || p.name || 'Layer';
+}
+
+function featName(p) {
+  return p.Name || p.name || p.Name_1 || p.Label || p.label || p._layer || p.OBJECTID || p.FID || 'Feature';
+}
+
+function acronym(s) {
+  return String(s || '')
+    .split(/[ _-]+/)
+    .filter(Boolean)
+    .map(x => x[0])
+    .join('')
+    .slice(0, 3)
+    .toUpperCase() || 'SG';
+}
+
+function configFor(project) {
+  return state.config[project] || DEFAULT_PROJECTS[project] || {};
+}
+
+function labelsDefaultFor(project) {
+  const c = configFor(project);
+  return !!(c.labelsDefault ?? c.labels ?? false);
+}
+
+function visibleDefaultFor(project) {
+  const c = configFor(project);
+  return (c.visibleDefault ?? c.visible ?? true) !== false;
+}
+
+function opacityFor(project) {
+  const c = configFor(project);
+  return c.opacity ?? .25;
+}
+
+function pointModeFor(project) {
+  const c = configFor(project);
+  return c.pointMode || c.point_mode || 'normal';
+}
+
+function blobForFeature(f) {
+  const p = f.properties || {};
+  return norm([
+    p.Name,
+    p.name,
+    p.Label,
+    p.label,
+    p._layer,
+    p.layer,
+    p.Layer,
+    p.Project,
+    p.project,
+    p._project
+  ].filter(Boolean).join(' '));
+}
+
+function blobForItem(item) {
+  const p = item.feature?.properties || {};
+  return norm([
+    item.name,
+    item.layer,
+    item.project,
+    p.Name,
+    p.name,
+    p.Label,
+    p.label,
+    p._layer,
+    p.layer,
+    p.Layer,
+    p.Project,
+    p.project,
+    p._project
+  ].filter(Boolean).join(' '));
+}
+
+function isHardHiddenBlob(blob) {
+  return HARD_HIDE_LABELS.some(label => {
+    const n = norm(label);
+    if (n === 'lab') return /\blab\b/.test(blob);
+    if (n === 'office') return /\boffice\b/.test(blob);
+    return blob.includes(n);
+  });
+}
+
+function isHardHiddenFeature(f) {
+  return isHardHiddenBlob(blobForFeature(f));
+}
+
+function isHardHiddenItem(item) {
+  return isHardHiddenBlob(blobForItem(item));
+}
+
+function groupKeyFor(project, layer, name) {
+  let t = String(layer || name || '').replace(/\s+/g, '_');
+  let m;
+
+  if ((m = t.match(/^High_Tunnels?_(\d+)/i))) return `${project}|High_Tunnels_${m[1]}`;
+  if ((m = t.match(/^Shade_?House_(\d+)/i)) || (m = t.match(/^Shadehouse_(\d+)/i))) return `${project}|Shade_House_${m[1]}`;
+  if ((m = t.match(/^Can_Yard_(\d+)/i))) return `${project}|Can_Yard_${m[1]}`;
+  if ((m = t.match(/^Four_?Bays?_(\d*)/i))) return `${project}|Four_Bays`;
+  if ((m = t.match(/^Cold_Frame_(\d+)/i))) return `${project}|Cold_Frame`;
+  if ((m = t.match(/^Block[_ #]*(\d+)/i))) return `${project}|Block_${m[1]}`;
+
+  return `${project}|${t.replace(/_[A-Z]$/, '')}`;
+}
+
+function colorFor(item) {
+  const explicit = configFor(item.project).color;
+
+  if (item.project === 'Structures / Yards') {
+    const palette = [
+      '#0f766e',
+      '#0284c7',
+      '#7c3aed',
+      '#b45309',
+      '#dc2626',
+      '#0891b2',
+      '#4f46e5',
+      '#be185d',
+      '#15803d',
+      '#9333ea',
+      '#475569'
+    ];
+
+    let h = 0;
+    for (const ch of item.groupKey) h = ((h << 5) - h + ch.charCodeAt(0)) >>> 0;
+    return palette[h % palette.length];
+  }
+
+  return explicit || '#0f766e';
+}
+
+function labelText(item) {
+  const props = item.feature?.properties || {};
+
+  let raw = [
+    props._short_label,
+    props.ShortLabel,
+    props.short_label,
+    props.Label,
+    props.label,
+    props.Name,
+    props.name,
+    item.name,
+    item.layer
+  ].filter(Boolean).join(' ');
+
+  let t = String(raw || '')
+    .replace(/_/g, ' ')
+    .replace(/\b(acres?|acreage|ac|area|sqft|square feet)\b/gi, '')
+    .replace(/\bAures\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  let m;
+
+  if ((m = t.match(/\bCY\s*0?(\d{1,2})\s*[- ]?([A-Z])?/i))) {
+    return 'CY' + String(m[1]).padStart(2, '0') + (m[2] ? m[2].toUpperCase() : '');
+  }
+
+  if ((m = t.match(/\bCan\s*Yard\s*0?(\d{1,2})\s*[- ]?([A-Z])?/i))) {
+    return 'CY' + String(m[1]).padStart(2, '0') + (m[2] ? m[2].toUpperCase() : '');
+  }
+
+  if ((m = t.match(/\bHT\s*0?(\d{1,2})\s*[- ]?([A-Z])?/i))) {
+    return 'HT' + String(m[1]).padStart(2, '0') + (m[2] ? m[2].toUpperCase() : '');
+  }
+
+  if ((m = t.match(/\bHigh\s*Tunnels?\s*0?(\d{1,2})\s*[- ]?([A-Z])?/i))) {
+    return 'HT' + String(m[1]).padStart(2, '0') + (m[2] ? m[2].toUpperCase() : '');
+  }
+
+  if ((m = t.match(/\bSH\s*0?(\d{1,2})\s*[- ]?([A-Z])?/i))) {
+    return 'SH' + String(m[1]).padStart(2, '0') + (m[2] ? '-' + m[2].toUpperCase() : '');
+  }
+
+  if ((m = t.match(/\bShade\s*House\s*0?(\d{1,2})\s*[- ]?([A-Z])?/i)) || (m = t.match(/\bShadehouse\s*0?(\d{1,2})\s*[- ]?([A-Z])?/i))) {
+    return 'SH' + String(m[1]).padStart(2, '0') + (m[2] ? '-' + m[2].toUpperCase() : '');
+  }
+
+  if ((m = t.match(/\bFB\s*0?(\d{1,2})/i))) {
+    return 'FB' + String(m[1]).padStart(2, '0');
+  }
+
+  if ((m = t.match(/\bFour\s*Bays?\s*0?(\d{1,2})/i))) {
+    return 'FB' + String(m[1]).padStart(2, '0');
+  }
+
+  if ((m = t.match(/\bZone\s*0?(\d{1,2})/i))) {
+    return 'Zone ' + String(m[1]).padStart(2, '0');
+  }
+
+  if ((m = t.match(/\bHead\s*House\s*0?(\d{1,2})/i))) {
+    return 'Head House ' + String(m[1]).padStart(2, '0');
+  }
+
+  if ((m = t.match(/\bBlock\s*#?\s*(\d+)/i))) {
+    return 'Block ' + m[1];
+  }
+
+  return state.shortLabels ? acronym(t) : clean(t);
+}
+
+function centerOf(f) {
+  try {
+    const pt = turf.pointOnFeature(f);
+    return [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
+  } catch (e) {
+    const g = f.geometry;
+    if (g && g.type === 'Point') return [g.coordinates[1], g.coordinates[0]];
+    return null;
+  }
+}
+
+function areaOf(f) {
+  try {
+    return turf.area(f);
+  } catch (e) {
+    return 0;
+  }
+}
+
+function normalizeFeature(f, i) {
+  const p = f.properties || {};
+  const project = projectOf(p);
+  const layer = sourceLayer(p);
+  const name = featName(p);
+  const center = centerOf(f);
+  const groupKey = groupKeyFor(project, layer, name);
+
+  return {
+    key: p._feature_key || `${project}|${layer}|${p.OBJECTID || p.FID || i}`,
+    project,
+    layer,
+    name,
+    feature: f,
+    center,
+    groupKey,
+    geom: f.geometry?.type || 'Unknown',
+    area: areaOf(f)
+  };
+}
+
+const map = L.map('map', { preferCanvas: true }).setView([36.78, -119.42], 16);
+
+const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 22,
+  crossOrigin: true,
+  attribution: '&copy; OpenStreetMap'
+});
+
+const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 19,
+  maxZoom: 22,
+  crossOrigin: true,
+  attribution: 'Tiles &copy; Esri'
+}).addTo(map);
+
+function style(item, sel = false) {
+  let c = colorFor(item);
+  let fillOpacity = opacityFor(item.project);
+
+  if (item.project.startsWith('Block')) fillOpacity = .11;
+
+  return {
+    color: c,
+    weight: sel ? 4 : 2,
+    fillColor: c,
+    fillOpacity
+  };
+}
+
+function loadJson(path) {
+  return fetch(path + '?ts=' + Date.now(), { cache: 'no-store' }).then(async r => {
+    if (!r.ok) throw new Error(path + ' ' + r.status);
+    const txt = await r.text();
+
+    try {
+      return JSON.parse(txt);
+    } catch (e) {
+      throw new Error(path + ' returned non-JSON');
+    }
+  });
+}
+
+async function loadFirst(paths) {
+  let lastErr;
+
+  for (const path of paths) {
+    try {
+      return await loadJson(path);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  throw lastErr;
+}
+
+async function init() {
+  const polys = await loadFirst([
+    '/data/combined_polygons.geojson',
+    'data/combined_polygons.geojson',
+    '/data/structures_polygons.geojson',
+    'data/structures_polygons.geojson'
+  ]);
+
+  try {
+    const cfg = await loadFirst([
+      '/data/map_config.json',
+      'data/map_config.json'
+    ]);
+
+    if (cfg.projects) state.config = { ...DEFAULT_PROJECTS, ...cfg.projects };
+  } catch (e) {}
+
+  state.items = (polys.features || [])
+    .filter(f => !isHardHiddenFeature(f))
+    .map(normalizeFeature)
+    .filter(x => x.center && !isHardHiddenItem(x));
+
+  buildGroups();
+  applyFilter();
+
+  $('sub').textContent = `${state.items.length.toLocaleString()} features loaded`;
+  fitAll();
+}
+
+function buildGroups() {
+  state.groups.clear();
+
+  for (const item of state.items) {
+    if (!state.groups.has(item.project)) {
+      state.groups.set(item.project, {
+        name: item.project,
+        items: [],
+        visible: visibleDefaultFor(item.project),
+        labels: labelsDefaultFor(item.project),
+        layers: new Map()
+      });
+    }
+
+    let g = state.groups.get(item.project);
+    g.items.push(item);
+
+    if (!g.layers.has(item.layer)) g.layers.set(item.layer, 0);
+    g.layers.set(item.layer, g.layers.get(item.layer) + 1);
+  }
+}
+
+function renderProjects() {
+  let html = '';
+
+  for (const g of [...state.groups.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+    const c = configFor(g.name).color || colorFor(g.items[0]);
+
+    html += `
+      <div class="project" data-project="${g.name}">
+        <div class="phead">
+          <span class="sw" style="background:${c}"></span>
+          <div class="pname">${g.name}</div>
+          <span class="badge">${g.items.length}</span>
+        </div>
+        <div class="pactions">
+          <button class="${g.visible ? 'on' : ''}" data-vis="${g.name}">Visible</button>
+          <button class="${g.labels ? 'on' : ''}" data-lab="${g.name}">Labels</button>
+          <button data-zoom="${g.name}">Zoom</button>
+        </div>
+        <div class="plist">
+          ${[...g.layers.entries()].sort().map(([l, n]) => `<div class="layerrow"><span>${clean(l)}</span><small>${n}</small></div>`).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  $('projects').innerHTML = html;
+
+  $('projects').querySelectorAll('[data-project]').forEach(el => {
+    el.querySelector('.phead').onclick = () => el.classList.toggle('open');
+  });
+
+  $('projects').querySelectorAll('[data-vis]').forEach(b => {
+    b.onclick = e => {
+      e.stopPropagation();
+      const g = state.groups.get(b.dataset.vis);
+      g.visible = !g.visible;
+      applyFilter();
+    };
+  });
+
+  $('projects').querySelectorAll('[data-lab]').forEach(b => {
+    b.onclick = e => {
+      e.stopPropagation();
+      const g = state.groups.get(b.dataset.lab);
+      g.labels = !g.labels;
+      renderLabels();
+      renderProjects();
+    };
+  });
+
+  $('projects').querySelectorAll('[data-zoom]').forEach(b => {
+    b.onclick = e => {
+      e.stopPropagation();
+      zoomProject(b.dataset.zoom);
+    };
+  });
+}
+
+function renderList() {
+  const rows = state.filtered.slice(0, 600).map(item => `
+    <div class="item" data-key="${item.key}">
+      <div class="ib" style="background:${colorFor(item)}">${acronym(item.project)}</div>
+      <div class="it">
+        <b>${labelText(item)}</b>
+        <small>${item.project} • ${clean(item.layer)}</small>
+      </div>
+    </div>
+  `).join('');
+
+  $('list').innerHTML = rows || '<div class="note">No results.</div>';
+
+  $('list').querySelectorAll('[data-key]').forEach(r => {
+    r.onclick = () => openItem(state.items.find(x => x.key === r.dataset.key));
+  });
+}
+
+function renderPills() {
+  $('pillbar').innerHTML = [...state.groups.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(g => {
+      const c = configFor(g.name).color || colorFor(g.items[0]);
+      return `<span class="pill"><i class="dot" style="background:${c}"></i>${g.name} <small>${g.items.length}</small></span>`;
+    })
+    .join('');
+}
+
+function renderMap() {
+  if (state.polys) map.removeLayer(state.polys);
+  if (state.points) map.removeLayer(state.points);
+  if (state.clusters) map.removeLayer(state.clusters);
+
+  const visible = state.filtered.filter(i => state.groups.get(i.project)?.visible && !isHardHiddenItem(i));
+
+  const fc = {
+    type: 'FeatureCollection',
+    features: visible.map(i => i.feature)
+  };
+
+  state.polys = L.geoJSON(fc, {
+    style: f => {
+      const item = state.items.find(x => x.feature === f) || normalizeFeature(f, 0);
+      return style(item, state.current?.key === item.key);
+    },
+    onEachFeature: (f, layer) => {
+      const item = state.items.find(x => x.feature === f) || normalizeFeature(f, 0);
+
+      layer.on('click', () => openItem(item));
+
+      layer.bindPopup(`
+        <b>${labelText(item)}</b>
+        <div class="popup-grid">
+          <b>Project</b><span>${item.project}</span>
+          <b>Layer</b><span>${clean(item.layer)}</span>
+        </div>
+      `);
+    }
+  });
+
+  if (state.showPolys) state.polys.addTo(map);
+
+  const normal = L.layerGroup();
+  const cluster = L.markerClusterGroup({
+    disableClusteringAtZoom: 19,
+    spiderfyOnMaxZoom: true
+  });
+
+  for (const item of visible) {
+    const marker = L.circleMarker(item.center, {
+      radius: 7,
+      color: '#fff',
+      weight: 2,
+      fillColor: colorFor(item),
+      fillOpacity: 1
+    });
+
+    marker.on('click', () => openItem(item));
+
+    if (pointModeFor(item.project) === 'cluster') cluster.addLayer(marker);
+    else normal.addLayer(marker);
+  }
+
+  state.points = normal;
+  state.clusters = cluster;
+
+  if (state.showPoints) {
+    normal.addTo(map);
+    cluster.addTo(map);
+  }
+
+  renderLabels();
+  $('shownStat').textContent = `${visible.length.toLocaleString()} shown`;
+}
+
+function renderLabels() {
+  for (const m of state.labels) map.removeLayer(m);
+
+  state.labels = [];
+
+  const used = new Set();
+
+  for (const item of state.filtered) {
+    if (isHardHiddenItem(item)) continue;
+
+    const g = state.groups.get(item.project);
+    if (!g?.visible) continue;
+    if (!(state.allLabels || g.labels || state.current?.key === item.key)) continue;
+
+    const txt = labelText(item);
+
+    if (!txt || isHardHiddenBlob(norm(txt))) continue;
+
+    const key = item.project + '|' + txt + '|' + Math.round(item.center[0] * 100000) + '|' + Math.round(item.center[1] * 100000);
+    if (used.has(key)) continue;
+
+    used.add(key);
+
+    let cls = item.area > 3000 ? 'label' : 'label small';
+    if (item.area < 800) cls = 'label tiny';
+
+    let icon = L.divIcon({
+      className: '',
+      html: `<div class="${cls}">${txt}</div>`
+    });
+
+    let mk = L.marker(item.center, {
+      icon,
+      interactive: false,
+      keyboard: false
+    }).addTo(map);
+
+    state.labels.push(mk);
+  }
+}
+
+function applyFilter() {
+  const q = $('search').value.trim().toLowerCase();
+
+  state.filtered = state.items.filter(i => {
+    if (isHardHiddenItem(i)) return false;
+    if (!q) return true;
+
+    return [i.project, i.layer, i.name, labelText(i)]
+      .join(' ')
+      .toLowerCase()
+      .includes(q);
+  });
+
+  renderProjects();
+  renderList();
+  renderMap();
+  renderPills();
+
+  $('featureStat').textContent = `${state.items.length.toLocaleString()} features`;
+  showSuggestions();
+}
+
+function showSuggestions() {
+  const q = $('search').value.trim().toLowerCase();
+  const box = $('suggest');
+
+  if (!q) {
+    box.classList.remove('show');
+    return;
+  }
+
+  const matches = state.items
+    .filter(i => !isHardHiddenItem(i))
+    .filter(i => [i.project, i.layer, i.name, labelText(i)].join(' ').toLowerCase().includes(q))
+    .slice(0, 8);
+
+  box.innerHTML = matches.map(i => `
+    <div class="sug" data-key="${i.key}">
+      ${labelText(i)}
+      <small>${i.project} • ${clean(i.layer)}</small>
+    </div>
+  `).join('');
+
+  box.classList.toggle('show', matches.length > 0);
+
+  box.querySelectorAll('[data-key]').forEach(r => {
+    r.onclick = () => {
+      const it = state.items.find(x => x.key === r.dataset.key);
+      $('suggest').classList.remove('show');
+      openItem(it);
+    };
+  });
+}
+
+function openItem(item) {
+  if (!item || isHardHiddenItem(item)) return;
+
+  state.current = item;
+
+  $('drawer').classList.add('open');
+  $('dTitle').textContent = labelText(item);
+  $('dSub').textContent = `${item.project} • ${clean(item.layer)}`;
+
+  $('dDetails').innerHTML = `
+    <b>Project</b><span>${item.project}</span>
+    <b>Layer</b><span>${clean(item.layer)}</span>
+    <b>Geometry</b><span>${item.geom}</span>
+    <b>Area</b><span>${item.area ? ((item.area * 0.000247105).toFixed(2) + ' ac') : '—'}</span>
+    <b>Coords</b><span>${item.center[0].toFixed(6)}, ${item.center[1].toFixed(6)}</span>
+    <b>Color group</b><span>${clean(item.groupKey.split('|')[1])}</span>
+  `;
+
+  map.flyTo(item.center, Math.max(map.getZoom(), 18), { duration: .5 });
+
+  if (state.polys) {
+    state.polys.setStyle(f => style(
+      state.items.find(x => x.feature === f) || normalizeFeature(f, 0),
+      state.current?.feature === f
+    ));
+  }
+
+  renderLabels();
+}
+
+function zoomProject(name) {
+  const items = state.items.filter(i => i.project === name && !isHardHiddenItem(i));
+  const b = L.geoJSON({
+    type: 'FeatureCollection',
+    features: items.map(i => i.feature)
+  }).getBounds();
+
+  if (b.isValid()) map.fitBounds(b.pad(.14));
+}
+
+function fitAll() {
+  const b = L.geoJSON({
+    type: 'FeatureCollection',
+    features: state.filtered.filter(i => !isHardHiddenItem(i)).map(i => i.feature)
+  }).getBounds();
+
+  if (b.isValid()) map.fitBounds(b.pad(.12));
+}
+
+function setBase(which) {
+  state.base = which;
+
+  if (which === 'street') {
+    map.removeLayer(sat);
+    street.addTo(map);
+  } else {
+    map.removeLayer(street);
+    sat.addTo(map);
+  }
+
+  $('satBtn').classList.toggle('on', which === 'sat');
+  $('streetBtn').classList.toggle('on', which === 'street');
+}
+
+$('panelToggle').onclick = () => $('side').classList.toggle('collapsed');
+$('openSide').onclick = () => $('side').classList.remove('collapsed');
+$('fitBtn').onclick = fitAll;
+$('search').oninput = applyFilter;
+$('search').onfocus = showSuggestions;
+
+$('satBtn').onclick = () => setBase('sat');
+$('streetBtn').onclick = () => setBase('street');
+
+$('polyBtn').onclick = () => {
+  state.showPolys = !state.showPolys;
+  $('polyBtn').classList.toggle('on', state.showPolys);
+  renderMap();
+};
+
+$('pointBtn').onclick = () => {
+  state.showPoints = !state.showPoints;
+  $('pointBtn').classList.toggle('on', state.showPoints);
+  renderMap();
+};
+
+$('allLabelsBtn').onclick = () => {
+  state.allLabels = !state.allLabels;
+  $('allLabelsBtn').classList.toggle('on', state.allLabels);
+  $('labelStat').textContent = state.allLabels ? 'all labels' : 'defaults';
+  renderLabels();
+};
+
+$('shortBtn').onclick = () => {
+  state.shortLabels = !state.shortLabels;
+  $('shortBtn').classList.toggle('on', state.shortLabels);
+  renderLabels();
+  renderList();
+};
+
+$('closeDrawer').onclick = () => $('drawer').classList.remove('open');
+
+$('zoomBtn').onclick = () => {
+  if (state.current) map.setView(state.current.center, 20);
+};
+
+$('gmapBtn').onclick = () => {
+  if (state.current) open(`https://www.google.com/maps?q=${state.current.center[0]},${state.current.center[1]}`, '_blank');
+};
+
+$('amapBtn').onclick = () => {
+  if (state.current) open(`https://maps.apple.com/?ll=${state.current.center[0]},${state.current.center[1]}`, '_blank');
+};
+
+$('coordBtn').onclick = async () => {
+  if (state.current) {
+    await navigator.clipboard.writeText(`${state.current.center[0].toFixed(6)}, ${state.current.center[1].toFixed(6)}`);
+    toast('Coordinates copied');
+  }
+};
+
+$('clearBtn').onclick = () => {
+  $('search').value = '';
+  applyFilter();
+};
+
+$('copyBtn').onclick = async () => {
+  const c = map.getCenter();
+  await navigator.clipboard.writeText(`${location.origin}${location.pathname}#${map.getZoom()}/${c.lat.toFixed(6)}/${c.lng.toFixed(6)}`);
+  toast('Map view copied');
+};
+
+$('gpsBtn').onclick = () => {
+  if (!navigator.geolocation) return toast('GPS not available');
+
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      const ll = [p.coords.latitude, p.coords.longitude];
+
+      if (state.userMarker) map.removeLayer(state.userMarker);
+
+      state.userMarker = L.marker(ll, {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="locdot"></div>'
+        })
+      }).addTo(map);
+
+      map.setView(ll, 18);
+    },
+    () => toast('Unable to get GPS')
+  );
+};
+
+document.querySelectorAll('.tab').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    $(b.dataset.tab).classList.add('on');
+  };
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#suggest') && !e.target.closest('#search')) $('suggest').classList.remove('show');
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js').catch(() => {});
+}
+
+init().catch(e => {
+  console.error(e);
+  $('sub').textContent = 'Map data failed to load';
+  toast(e.message);
+});
 </script>
-</body>
-</html>
