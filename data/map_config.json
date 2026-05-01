@@ -1,9 +1,9 @@
 {
   "projects": {
-    "Structures / Yards": {
+    "Structures": {
       "labels": true,
       "visible": true,
-      "opacity": 0.24,
+      "opacity": 0.26,
       "point_mode": "normal"
     },
     "Chemical Locations": {

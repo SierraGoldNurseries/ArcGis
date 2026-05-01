@@ -1,9 +1,9 @@
 {
   "projects": {
-    "Structures / Yards": 124
+    "Structures": 114
   },
-  "shape_features": 62,
-  "point_features": 62,
-  "total_features": 124,
-  "note": "Tree/detail layers skipped. Usable Structures, Chemical, Irrigation, Owl, Block, and Prune layers exported."
+  "shape_features": 57,
+  "point_features": 57,
+  "total_features": 114,
+  "note": "Tree/detail layers and hard-hidden facility items removed. Structures / Yards renamed to Structures."
 }
