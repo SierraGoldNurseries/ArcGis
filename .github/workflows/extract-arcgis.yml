@@ -6,7 +6,6 @@ on:
       - 'data/raw/**'
       - 'tools/extract_project.py'
       - '.github/workflows/extract-arcgis.yml'
-      - '.gitattributes'
   repository_dispatch:
     types: [arcgis_upload]
   workflow_dispatch:
@@ -14,10 +13,6 @@ on:
 permissions:
   contents: write
   actions: read
-
-concurrency:
-  group: arcgis-map-build
-  cancel-in-progress: true
 
 jobs:
   build-map-data:
@@ -28,58 +23,77 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.client_payload.branch || github.ref }}
           lfs: false
+          ref: ${{ github.event.client_payload.branch || github.ref }}
 
       - name: Install GIS libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y gdal-bin p7zip-full
-          ogrinfo --version
+          sudo apt-get install -y python3 python3-pip python3-venv p7zip-full gdal-bin
 
       - name: Ignore Git LFS pointer packages
-        shell: bash
         run: |
           set -euo pipefail
+
           skipped=0
-          if [ -d data/raw ]; then
-            while IFS= read -r -d '' f; do
-              if grep -q "git-lfs.github.com/spec" "$f" 2>/dev/null; then
-                echo "::warning file=$f::This is only a Git LFS pointer. GitHub LFS budget is exceeded, so the real file cannot be downloaded. Skipping this package in this run."
-                rm -f "$f"
-                skipped=$((skipped + 1))
-              fi
-            done < <(find data/raw -type f \( -iname '*.ppkx' -o -iname '*.mpkx' -o -iname '*.zip' \) -print0 2>/dev/null || true)
-          fi
+
+          for f in data/raw/*.ppkx data/raw/*.mpkx; do
+            [ -e "$f" ] || continue
+
+            if head -c 300 "$f" | grep -q "git-lfs.github.com/spec"; then
+              echo "Warning: $f is only a Git LFS pointer. Skipping it."
+              rm -f "$f"
+              skipped=$((skipped + 1))
+            fi
+          done
+
           echo "Skipped $skipped Git LFS pointer package(s)."
 
-      - name: Build combined polygons and points from every usable project in data/raw
-        shell: bash
+      - name: Build map data
         run: |
           set -euo pipefail
-          if ! find data/raw -type f \( \
-            -iname '*.ppkx' -o \
-            -iname '*.mpkx' -o \
-            -iname '*.zip' -o \
-            -iname '*.geojson' -o \
-            -iname '*.json' -o \
-            -iname '*.kml' -o \
-            -iname '*.shp' \
-          \) -print -quit 2>/dev/null | grep -q .; then
-            echo "::warning::No real raw ArcGIS/GIS files found to extract. If your .ppkx files are stored in Git LFS, re-upload the real files without LFS or increase the Git LFS budget."
-            exit 0
-          fi
-          python3 tools/extract_project.py
+          python tools/extract_project.py
+
+      - name: Verify generated files exist
+        run: |
+          set -euo pipefail
+
+          echo "Checking required generated files..."
+
+          test -f data/structures_polygons.geojson
+          test -f data/structures_points.geojson
+          test -f data/combined_polygons.geojson
+          test -f data/combined_points.geojson
+          test -f data/layer_inventory.csv
+          test -f data/map_config.json
+          test -f data/project_manifest.json
+
+          echo "Generated files found:"
+          ls -lh data/structures_polygons.geojson
+          ls -lh data/structures_points.geojson
+          ls -lh data/combined_polygons.geojson
+          ls -lh data/combined_points.geojson
+          ls -lh data/layer_inventory.csv
+          ls -lh data/map_config.json
+          ls -lh data/project_manifest.json
 
       - name: Commit rebuilt map data
-        shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/combined_polygons.geojson data/combined_points.geojson data/structures_polygons.geojson data/structures_points.geojson data/map_config.json data/project_manifest.json data/layer_inventory.csv data/layers/ 2>/dev/null || true
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          # Force-add generated files in case .gitignore is blocking GeoJSON/CSV/JSON.
+          git add -A data
+          git add -f data/*.geojson data/*.csv data/*.json || true
+          git add -f data/layers/*.geojson || true
+
+          echo "Git status after add:"
+          git status --short
+
           if git diff --cached --quiet; then
-            echo "No generated map-data changes to commit."
+            echo "No rebuilt map data changes to commit."
           else
             git commit -m "Auto-build combined ArcGIS map data"
             git push
