@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "Structures / Yards": 1,
+    "Prune South": 16985
+  },
+  "total_boundary_features": 16986,
+  "total_label_points": 16986,
+  "note": "Individual tree/point layers are intentionally skipped. Only polygon/block boundaries are exported."
+}
